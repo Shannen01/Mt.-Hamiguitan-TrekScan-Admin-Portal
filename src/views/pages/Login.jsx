@@ -95,6 +95,7 @@ function Login({ onLoginSuccess }) {
       <div className="login-card">
         <div className="login-header">
           <img src={logoImage} alt="TrekScan+ Admin Portal" className="login-logo" />
+          <h2 className="welcome-text">Welcome back, Admin!</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">

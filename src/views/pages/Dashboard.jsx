@@ -4,6 +4,7 @@ import AuthViewModel from '../../viewmodels/AuthViewModel.js';
 import ApiClient from '../../models/ApiClient.js';
 import { config } from '../../config/config.js';
 import '../style/Dashboard.css';
+import logoImage from '../../assets/Logo_admin_portal.png';
 
 // Dashboard page component
 function Dashboard({ onLogout }) {
@@ -39,7 +40,7 @@ function Dashboard({ onLogout }) {
     <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="header-content">
-          <h1>Trekscan Admin Dashboard</h1>
+          <img src={logoImage} alt="TrekScan+ Admin Portal" className="dashboard-logo" />
           <div className="user-info">
             <span>Welcome, {auth.user?.name || 'Admin'}</span>
             <button onClick={handleLogout} className="logout-button">
@@ -53,7 +54,6 @@ function Dashboard({ onLogout }) {
       <div className="dashboard-body">
         <aside className="sidebar">
           <div className="sidebar-header">
-            <span className="brand">TREKK+</span>
           </div>
           <nav className="sidebar-nav">
             <a className="nav-item active" href="#">
