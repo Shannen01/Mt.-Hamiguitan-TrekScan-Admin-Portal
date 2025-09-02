@@ -15,6 +15,8 @@ function Dashboard({ onLogout }) {
   const { auth, loading } = useViewModel(authViewModel);
 
   const handleLogout = async () => {
+    const confirmed = window.confirm('Are you sure you want to log out?');
+    if (!confirmed) return;
     try {
       await authViewModel.logout();
       if (onLogout) {

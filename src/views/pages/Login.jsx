@@ -4,6 +4,8 @@ import AuthViewModel from '../../viewmodels/AuthViewModel.js';
 import ApiClient from '../../models/ApiClient.js';
 import { config } from '../../config/config.js';
 import '../style/Login.css';
+import logoImage from '../../assets/Logo_admin_portal.png';
+import trekScanText from '../../assets/TrekScan+_Text.png';
 
 // Login page component
 function Login({ onLoginSuccess }) {
@@ -16,7 +18,7 @@ function Login({ onLoginSuccess }) {
   
   // Form state
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: ''
   });
   const [formErrors, setFormErrors] = useState({});
@@ -49,10 +51,8 @@ function Login({ onLoginSuccess }) {
   const validateForm = () => {
     const errors = {};
     
-    if (!formData.email) {
-      errors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'Email is invalid';
+    if (!formData.username) {
+      errors.username = 'Username is required';
     }
     
     if (!formData.password) {
@@ -89,10 +89,12 @@ function Login({ onLoginSuccess }) {
 
   return (
     <div className="login-container">
+      <div className="login-left">
+        <img src={trekScanText} alt="TrekScan+ Text" className="trek-scan-text" />
+      </div>
       <div className="login-card">
         <div className="login-header">
-          <h1>Trekscan Admin</h1>
-          <p>Sign in to your account</p>
+          <img src={logoImage} alt="TrekScan+ Admin Portal" className="login-logo" />
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
@@ -103,19 +105,19 @@ function Login({ onLoginSuccess }) {
           )}
 
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="username">Username</label>
             <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
+              type="text"
+              id="username"
+              name="username"
+              value={formData.username}
               onChange={handleInputChange}
-              className={formErrors.email ? 'error' : ''}
-              placeholder="Enter your email"
+              className={formErrors.username ? 'error' : ''}
+              placeholder="Enter your username"
               disabled={loading}
             />
-            {formErrors.email && (
-              <span className="field-error">{formErrors.email}</span>
+            {formErrors.username && (
+              <span className="field-error">{formErrors.username}</span>
             )}
           </div>
 

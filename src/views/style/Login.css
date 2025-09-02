@@ -5,12 +5,26 @@
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  justify-content: space-between;
+  background: url('../../assets/TrekkScanBg.png');
   background-attachment: fixed;
   background-repeat: no-repeat;
   background-size: cover;
+  background-position: center;
   padding: 20px;
+}
+
+.login-left {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-left: 60px;
+}
+
+.trek-scan-text {
+  max-width: 300px;
+  height: auto;
 }
 
 .login-card {
@@ -37,6 +51,13 @@
 .login-header {
   text-align: center;
   margin-bottom: 30px;
+}
+
+.login-logo {
+  max-width: 200px;
+  height: auto;
+  margin: 0 auto;
+  display: block;
 }
 
 .login-header h1 {
