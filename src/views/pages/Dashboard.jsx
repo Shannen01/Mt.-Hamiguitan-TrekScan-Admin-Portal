@@ -47,33 +47,56 @@ function Dashboard({ onLogout }) {
         </div>
       </header>
 
-      <main className="dashboard-main">
-        <div className="dashboard-grid">
-          <div className="dashboard-card">
-            <h3>Users</h3>
-            <p>Manage user accounts and permissions</p>
-            <button className="card-button">View Users</button>
+      {/* Body: sidebar left, main content right */}
+      <div className="dashboard-body">
+        <aside className="sidebar">
+          <div className="sidebar-header">
+            <span className="brand">TREKK+</span>
           </div>
+          <nav className="sidebar-nav">
+            <a className="nav-item active" href="#">
+              <span>Dashboard</span>
+            </a>
+            <a className="nav-item" href="#">
+              <span>Climb Request</span>
+            </a>
+            <a className="nav-item" href="#">
+              <span>User Management</span>
+            </a>
+            <a className="nav-item" href="#">
+              <span>Reports</span>
+            </a>
+          </nav>
+        </aside>
 
-          <div className="dashboard-card">
-            <h3>Treks</h3>
-            <p>Manage trek listings and content</p>
-            <button className="card-button">View Treks</button>
-          </div>
+        <main className="dashboard-main">
+          <div className="dashboard-grid">
+            <div className="dashboard-card">
+              <h3>Users</h3>
+              <p>Manage user accounts and permissions</p>
+              <button className="card-button">View Users</button>
+            </div>
 
-          <div className="dashboard-card">
-            <h3>Analytics</h3>
-            <p>View usage statistics and reports</p>
-            <button className="card-button">View Analytics</button>
-          </div>
+            <div className="dashboard-card">
+              <h3>Treks</h3>
+              <p>Manage trek listings and content</p>
+              <button className="card-button">View Treks</button>
+            </div>
 
-          <div className="dashboard-card">
-            <h3>Settings</h3>
-            <p>Configure system settings</p>
-            <button className="card-button">View Settings</button>
+            <div className="dashboard-card">
+              <h3>Analytics</h3>
+              <p>View usage statistics and reports</p>
+              <button className="card-button">View Analytics</button>
+            </div>
+
+            <div className="dashboard-card">
+              <h3>Settings</h3>
+              <p>Configure system settings</p>
+              <button className="card-button">View Settings</button>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
