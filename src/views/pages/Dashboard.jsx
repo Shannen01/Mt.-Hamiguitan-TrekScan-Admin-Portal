@@ -5,6 +5,9 @@ import ApiClient from '../../models/ApiClient.js';
 import { config } from '../../config/config.js';
 import '../style/Dashboard.css';
 import logoImage from '../../assets/Logo_admin_portal.png';
+import ClimbRequest from './ClimbRequest.jsx';
+import UserManagement from './UserManagement.jsx';
+import Reports from './Reports.jsx';
 
 // Dashboard page component
 function Dashboard({ onLogout }) {
@@ -96,7 +99,14 @@ function Dashboard({ onLogout }) {
           </nav>
         </aside>
 
-        <main className="dashboard-main"></main>
+        <main className="dashboard-main">
+          {activeItem === 'dashboard' && (
+            <div className="page-empty"></div>
+          )}
+          {activeItem === 'climb' && <ClimbRequest />}
+          {activeItem === 'users' && <UserManagement />}
+          {activeItem === 'reports' && <Reports />}
+        </main>
       </div>
     </div>
   );
