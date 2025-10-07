@@ -4,7 +4,7 @@ import AuthViewModel from './viewmodels/AuthViewModel.js'
 import ApiClient from './models/ApiClient.js'
 import { config } from './config/config.js'
 import Login from './views/pages/Login.jsx'
-import Dashboard from './views/pages/Dashboard.jsx'
+import AppLayout from './layouts/AppLayout.jsx'
 import './App.css'
 
 function App() {
@@ -42,7 +42,7 @@ function App() {
   return (
     <div className="app">
       {isAuthenticated ? (
-        <Dashboard onLogout={handleLogout} />
+        <AppLayout />
       ) : (
         <Login onLoginSuccess={handleLoginSuccess} />
       )}

@@ -74,162 +74,21 @@
   transform: translateY(-1px);
 }
 
-/* (removed duplicate .dashboard-main; the definitive rule is defined below) */
+/* (legacy dashboard page element styles removed: title bar, cards, charts, lists) */
 
-/* Title bar */
-.dashboard-title-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
+/* removed: dashboard-cards-row and metric/progress styles */
 
-.dashboard-title-bar h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #111827;
-}
+/* removed: bottom grid layout */
 
-.title-date-button {
-  background: #111827;
-  color: #fff;
-  border: 0;
-  padding: 8px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-}
+/* removed: mock chart styles */
 
-/* Top row cards */
-.dashboard-cards-row {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-  margin-bottom: 24px;
-}
+/* removed: list table styles */
 
-.metric-card .metric-card-header h3,
-.progress-card .metric-card-header h3 { margin: 0; font-size: 16px; color: #4b5563; }
+/* removed: upcoming section and badges */
 
-.metric-card-body { margin-top: 8px; }
+/* removed: dashboard-grid */
 
-.metric-value { font-size: 32px; font-weight: 800; color: #0f172a; }
-
-.metric-subtext { font-size: 14px; color: #6b7280; margin-top: 6px; }
-.metric-subtext.positive { color: #15803d; }
-
-.progress-bar {
-  position: relative;
-  height: 8px;
-  border-radius: 9999px;
-  background: #e5e7eb;
-  overflow: hidden;
-  margin-top: 12px;
-}
-
-.progress-approved {
-  height: 100%;
-  background: #111827;
-}
-.progress-pending { display: none; }
-
-/* Bottom grid */
-.dashboard-bottom-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-}
-
-/* Mock chart */
-.mock-bar-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 24px;
-  height: 240px;
-  margin-top: 16px;
-}
-
-.mock-bar-chart .bar {
-  width: 80px;
-  background: #a0aec0;
-  border-radius: 6px 6px 0 0;
-}
-
-.chart-labels { display: grid; grid-template-columns: repeat(6, 1fr); margin-top: 10px; color: #6b7280; font-size: 12px; }
-
-/* List card */
-.list-header h3 { margin: 0 0 4px 0; }
-.list-header p { margin: 0 0 12px 0; color: #6b7280; font-size: 14px; }
-
-.list-select { display: flex; justify-content: space-between; align-items: center; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; color: #111827; margin-bottom: 10px; }
-.list-select .chevron { color: #6b7280; }
-.list-table { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
-.list-row { display: flex; padding: 12px 14px; background: #fff; border-top: 1px solid #f1f5f9; color: #111827; }
-.list-row.list-head { background: #f9fafb; font-weight: 600; color: #374151; }
-.list-row .col.name { flex: 1; color: #111827; }
-
-.upcoming-card { margin-top: 24px; }
-.upcoming-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.btn-view-all { background: #111827; color: #fff; border: 0; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
-.upcoming-tabs { display: flex; gap: 12px; margin-bottom: 12px; }
-.upcoming-tabs .tab { background: #f3f4f6; border: 1px solid #e5e7eb; color: #111827; padding: 8px 12px; border-radius: 9999px; cursor: pointer; }
-.upcoming-tabs .tab.active { background: #111827; color: #fff; border-color: #111827; }
-.upcoming-table { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
-.upcoming-table .row { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 12px; align-items: center; padding: 14px 16px; background: #fff; color: #111827; }
-.upcoming-table .row.head { background: #f9fafb; font-weight: 600; color: #374151; }
-.badge { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 9999px; }
-.badge-success { background: #dcfce7; color: #166534; }
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
-}
-
-.dashboard-card {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
-  transition: all 0.3s ease;
-}
-
-.dashboard-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
-}
-
-.dashboard-card h3 {
-  color: #1a202c;
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-}
-
-.dashboard-card p {
-  color: #718096;
-  font-size: 14px;
-  margin: 0 0 20px 0;
-  line-height: 1.5;
-}
-
-.card-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  width: 100%;
-}
-
-.card-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
+/* removed: card and button styles */
 
 .loading {
   display: flex;
