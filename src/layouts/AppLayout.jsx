@@ -1,23 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { useViewModel } from '../hooks/useViewModel.js';
-import AuthViewModel from '../viewmodels/AuthViewModel.js';
-import ApiClient from '../models/ApiClient.js';
-import { config } from '../config/config.js';
+import React, { useState, useEffect, useRef } from 'react';
 import '../views/style/Dashboard.css';
 import logoImage from '../assets/Logo_admin_portal.png';
+import { Home, Mountain, Users, BarChart3 } from 'lucide-react';
+import { Button, IconButton, Menu, MenuItem, ListItemIcon, Tooltip } from '@mui/material';
+import { CalendarToday, AccountCircle, Settings as SettingsIcon, Logout as LogoutIcon, Notifications as NotificationsIcon, DarkMode as DarkModeIcon } from '@mui/icons-material';
 
 import Dashboard from '../views/pages/Dashboard.jsx';
 import ClimbRequest from '../views/pages/ClimbRequest.jsx';
 import UserManagement from '../views/pages/UserManagement.jsx';
 import Reports from '../views/pages/Reports.jsx';
 
-function AppLayout() {
+function AppLayout({ onLogout }) {
   const [activeItem, setActiveItem] = useState('dashboard');
-
-  // Initialize ViewModel for auth-related header info and logout
-  const apiClient = new ApiClient(config.api.baseURL);
-  const authViewModel = new AuthViewModel(apiClient);
-  const { auth, loading } = useViewModel(authViewModel);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const [openModal, setOpenModal] = useState(null); // 'profile' | 'settings' | null
+  const actionsRef = useRef(null);
 
   useEffect(() => {
     const main = document.querySelector('.dashboard-main');
@@ -26,27 +24,75 @@ function AppLayout() {
     }
   }, [activeItem]);
 
-  const handleLogout = async () => {
-    const confirmed = window.confirm('Are you sure you want to log out?');
-    if (!confirmed) return;
-    try {
-      await authViewModel.logout();
-      // After logout, a parent auth gate will swap this layout out
-    } catch (error) {
-      console.error('Logout failed:', error);
+  // Close account menu on outside click or Escape
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (actionsRef.current && !actionsRef.current.contains(e.target)) {
+        setIsAccountOpen(false);
+      }
     }
-  };
+    function handleKey(e) {
+      if (e.key === 'Escape') {
+        setIsAccountOpen(false);
+        setOpenModal(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, []);
 
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="header-content">
           <img src={logoImage} alt="TrekScan+ Admin Portal" className="dashboard-logo" />
-          <div className="user-info">
-            <span>Welcome, {auth?.user?.name || 'Admin'}</span>
-            <button onClick={handleLogout} className="logout-button" disabled={loading}>
-              Logout
-            </button>
+          <div className="header-actions" ref={actionsRef}>
+            <Button variant="outlined" startIcon={<CalendarToday fontSize="small" />}>Today</Button>
+            <Tooltip title="Notifications">
+              <IconButton className="icon-btn has-dot" aria-label="Notifications">
+                <NotificationsIcon />
+                <span className="badge-dot" aria-hidden="true"></span>
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Account">
+              <IconButton
+                className="icon-btn"
+                aria-label="Account"
+                onClick={(e) => { setMenuAnchor(e.currentTarget); setIsAccountOpen(true); }}
+                aria-haspopup="menu"
+                aria-expanded={isAccountOpen}
+              >
+                <AccountCircle />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Toggle theme">
+              <IconButton className="icon-btn" aria-label="Toggle theme">
+                <DarkModeIcon />
+              </IconButton>
+            </Tooltip>
+
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={() => { setIsAccountOpen(false); setMenuAnchor(null); }}
+            >
+              <MenuItem onClick={() => { setIsAccountOpen(false); setMenuAnchor(null); setOpenModal('profile'); }}>
+                <ListItemIcon><AccountCircle fontSize="small" /></ListItemIcon>
+                Profile
+              </MenuItem>
+              <MenuItem onClick={() => { setIsAccountOpen(false); setMenuAnchor(null); setOpenModal('settings'); }}>
+                <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+                Settings
+              </MenuItem>
+              <MenuItem onClick={() => { setIsAccountOpen(false); setMenuAnchor(null); if (onLogout) onLogout(); }}>
+                <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
+                Logout
+              </MenuItem>
+            </Menu>
           </div>
         </div>
       </header>
@@ -60,6 +106,7 @@ function AppLayout() {
               href="#"
               onClick={(e) => { e.preventDefault(); setActiveItem('dashboard'); }}
             >
+              <Home size={18} strokeWidth={2} className="icon" aria-hidden="true" />
               <span>Dashboard</span>
             </a>
             <a
@@ -67,6 +114,7 @@ function AppLayout() {
               href="#"
               onClick={(e) => { e.preventDefault(); setActiveItem('climb'); }}
             >
+              <Mountain size={18} strokeWidth={2} className="icon" aria-hidden="true" />
               <span>Climb Request</span>
             </a>
             <a
@@ -74,6 +122,7 @@ function AppLayout() {
               href="#"
               onClick={(e) => { e.preventDefault(); setActiveItem('users'); }}
             >
+              <Users size={18} strokeWidth={2} className="icon" aria-hidden="true" />
               <span>User Management</span>
             </a>
             <a
@@ -81,6 +130,7 @@ function AppLayout() {
               href="#"
               onClick={(e) => { e.preventDefault(); setActiveItem('reports'); }}
             >
+              <BarChart3 size={18} strokeWidth={2} className="icon" aria-hidden="true" />
               <span>Reports</span>
             </a>
           </nav>
@@ -93,6 +143,22 @@ function AppLayout() {
           {activeItem === 'reports' && <Reports />}
         </main>
       </div>
+
+      {openModal && (
+        <div className="modal-backdrop" onClick={() => setOpenModal(null)}>
+          <div className="modal-card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{openModal === 'profile' ? 'My Profile' : 'Settings'}</h3>
+            </div>
+            <div className="modal-body">
+              <p>Placeholder content for {openModal}.</p>
+            </div>
+            <div className="modal-actions">
+              <button className="action-btn" type="button" onClick={() => setOpenModal(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -42,7 +42,7 @@ function App() {
   return (
     <div className="app">
       {isAuthenticated ? (
-        <AppLayout />
+        <AppLayout onLogout={handleLogout} />
       ) : (
         <Login onLoginSuccess={handleLoginSuccess} />
       )}
