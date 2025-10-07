@@ -16,6 +16,14 @@ function Login({ onLoginSuccess }) {
   // Connect ViewModel to React component
   const { loading, error, isAuthenticated } = useViewModel(authViewModel);
   
+  // Disable body scroll while Login is mounted
+  useEffect(() => {
+    document.body.classList.add('no-scroll');
+    return () => {
+      document.body.classList.remove('no-scroll');
+    };
+  }, []);
+
   // Form state
   const [formData, setFormData] = useState({
     username: '',

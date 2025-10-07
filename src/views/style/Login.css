@@ -227,3 +227,8 @@
     font-size: 24px;
   }
 }
+
+/* Disable page scroll when on Login page */
+body.no-scroll {
+  overflow: hidden;
+}

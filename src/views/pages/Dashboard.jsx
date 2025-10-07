@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useViewModel } from '../../hooks/useViewModel.js';
 import AuthViewModel from '../../viewmodels/AuthViewModel.js';
 import ApiClient from '../../models/ApiClient.js';
@@ -8,6 +8,15 @@ import logoImage from '../../assets/Logo_admin_portal.png';
 
 // Dashboard page component
 function Dashboard({ onLogout }) {
+  const [activeItem, setActiveItem] = useState('dashboard');
+
+  // Keep scroll behavior consistent: scroll main container to top on tab change
+  useEffect(() => {
+    const main = document.querySelector('.dashboard-main');
+    if (main) {
+      main.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [activeItem]);
   // Initialize ViewModel
   const apiClient = new ApiClient(config.api.baseURL);
   const authViewModel = new AuthViewModel(apiClient);
@@ -56,48 +65,38 @@ function Dashboard({ onLogout }) {
           <div className="sidebar-header">
           </div>
           <nav className="sidebar-nav">
-            <a className="nav-item active" href="#">
+            <a
+              className={`nav-item${activeItem === 'dashboard' ? ' active' : ''}`}
+              href="#"
+              onClick={(e) => { e.preventDefault(); setActiveItem('dashboard'); }}
+            >
               <span>Dashboard</span>
             </a>
-            <a className="nav-item" href="#">
+            <a
+              className={`nav-item${activeItem === 'climb' ? ' active' : ''}`}
+              href="#"
+              onClick={(e) => { e.preventDefault(); setActiveItem('climb'); }}
+            >
               <span>Climb Request</span>
             </a>
-            <a className="nav-item" href="#">
+            <a
+              className={`nav-item${activeItem === 'users' ? ' active' : ''}`}
+              href="#"
+              onClick={(e) => { e.preventDefault(); setActiveItem('users'); }}
+            >
               <span>User Management</span>
             </a>
-            <a className="nav-item" href="#">
+            <a
+              className={`nav-item${activeItem === 'reports' ? ' active' : ''}`}
+              href="#"
+              onClick={(e) => { e.preventDefault(); setActiveItem('reports'); }}
+            >
               <span>Reports</span>
             </a>
           </nav>
         </aside>
 
-        <main className="dashboard-main">
-          <div className="dashboard-grid">
-            <div className="dashboard-card">
-              <h3>Users</h3>
-              <p>Manage user accounts and permissions</p>
-              <button className="card-button">View Users</button>
-            </div>
-
-            <div className="dashboard-card">
-              <h3>Treks</h3>
-              <p>Manage trek listings and content</p>
-              <button className="card-button">View Treks</button>
-            </div>
-
-            <div className="dashboard-card">
-              <h3>Analytics</h3>
-              <p>View usage statistics and reports</p>
-              <button className="card-button">View Analytics</button>
-            </div>
-
-            <div className="dashboard-card">
-              <h3>Settings</h3>
-              <p>Configure system settings</p>
-              <button className="card-button">View Settings</button>
-            </div>
-          </div>
-        </main>
+        <main className="dashboard-main"></main>
       </div>
     </div>
   );
