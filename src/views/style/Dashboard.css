@@ -198,8 +198,11 @@
   height: calc(100vh - var(--header-height));
   overflow: auto; /* only main scrolls */
   max-width: 100%;
-  padding: 40px 20px;
+  padding: 15px 20px;
 }
+
+.dashboard-main h1 { color: 
+  #0c2915; font-size: 28px; font-weight: 700; margin: 0 0 12px 0; }
 
 /* keep previous sidebar styles */
 .sidebar-header {

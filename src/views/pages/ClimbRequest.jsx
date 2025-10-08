@@ -3,7 +3,11 @@ import '../style/ClimbRequest.css';
 
 function ClimbRequest() {
   return (
-    <div className="page-empty"></div>
+    <div className="dashboard-container">
+      <main className="climb-main">
+        <h1>Climb Request</h1>
+      </main>
+    </div>
   );
 }
 

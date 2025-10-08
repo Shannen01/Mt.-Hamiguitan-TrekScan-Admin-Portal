@@ -3,7 +3,11 @@ import '../style/Reports.css';
 
 function Reports() {
   return (
-    <div className="page-empty"></div>
+    <div className="dashboard-container">
+      <main className="reports-main">
+        <h1>Reports and Analytics</h1>
+      </main>
+    </div>
   );
 }
 
