@@ -1,5 +1,5 @@
 /* Dashboard page styles */
-:root { --sidebar-width: 220px; --header-height: 72px; }
+:root { --sidebar-width: 260px; --header-height: 72px; }
 .dashboard-container {
   display: flex;
   flex-direction: column;
