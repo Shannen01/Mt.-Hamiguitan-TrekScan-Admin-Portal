@@ -87,6 +87,24 @@ function Dashboard() {
   const capacityY = yAt(capacity);
 
   const [hover, setHover] = React.useState(null);
+  const [activeTab, setActiveTab] = React.useState('upcoming'); // 'upcoming' or 'recent'
+
+  // Data for upcoming climbs
+  const upcomingClimbs = [
+    { date: 'May 25 2025', name: 'Juan Dela Cruz', status: 'confirmed' },
+    { date: 'May 26 2025', name: 'Juan Tom-od', status: 'confirmed' },
+    { date: 'May 27 2025', name: 'Maria Santos', status: 'confirmed' },
+    { date: 'May 28 2025', name: 'Pedro Rodriguez', status: 'cancelled' },
+    { date: 'May 29 2025', name: 'Ana Garcia', status: 'confirmed' },
+  ];
+
+  // Data for recent approvals
+  const recentApprovals = [
+    { date: 'May 23 2025', name: 'Maria Santos', status: 'approved' },
+    { date: 'May 22 2025', name: 'Pedro Rodriguez', status: 'approved' },
+    { date: 'May 21 2025', name: 'Ana Garcia', status: 'approved' },
+    { date: 'May 20 2025', name: 'Carlos Lopez', status: 'approved' },
+  ];
 
   const StatsCard = ({ title, value, subtitle, progress }) => (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
@@ -298,8 +316,18 @@ function Dashboard() {
             </div>
             
             <div className="climbs-tabs">
-              <button className="tab-btn active">UPCOMING CLIMBS</button>
-              <button className="tab-btn">RECENT APPROVALS</button>
+              <button 
+                className={`tab-btn ${activeTab === 'upcoming' ? 'active' : ''}`}
+                onClick={() => setActiveTab('upcoming')}
+              >
+                UPCOMING CLIMBS
+              </button>
+              <button 
+                className={`tab-btn ${activeTab === 'recent' ? 'active' : ''}`}
+                onClick={() => setActiveTab('recent')}
+              >
+                RECENT APPROVALS
+              </button>
             </div>
             
             <div className="climbs-table">
@@ -308,20 +336,30 @@ function Dashboard() {
                 <div className="table-cell">Name</div>
                 <div className="table-cell">Status</div>
               </div>
-              <div className="table-row">
-                <div className="table-cell">May 25 2025</div>
-                <div className="table-cell">Juan Dela Cruz</div>
-                <div className="table-cell">
-                  <span className="status-badge confirmed">Confirmed</span>
-                </div>
-              </div>
-              <div className="table-row">
-                <div className="table-cell">May 26 2025</div>
-                <div className="table-cell">Juan Tom-od</div>
-                <div className="table-cell">
-                  <span className="status-badge confirmed">Confirmed</span>
-                </div>
-              </div>
+              {activeTab === 'upcoming' ? (
+                upcomingClimbs.map((climb, index) => (
+                  <div key={index} className="table-row">
+                    <div className="table-cell">{climb.date}</div>
+                    <div className="table-cell">{climb.name}</div>
+                    <div className="table-cell">
+                      <span className={`status-badge ${climb.status}`}>
+                        {climb.status === 'confirmed' ? 'Confirmed' : 
+                         climb.status === 'cancelled' ? 'Cancelled' : climb.status}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                recentApprovals.map((approval, index) => (
+                  <div key={index} className="table-row">
+                    <div className="table-cell">{approval.date}</div>
+                    <div className="table-cell">{approval.name}</div>
+                    <div className="table-cell">
+                      <span className="status-badge approved">Approved</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
