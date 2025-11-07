@@ -1,15 +1,15 @@
 /* Main container */
 .climb-main { 
-  height: calc(100vh - var(--header-height)); 
-  overflow: auto; 
+  height: auto;
   max-width: 100%; 
-  padding: 20px; 
+  padding: 24px 32px 0 32px;
+  padding-top: calc(var(--header-height) + 24px);
   background: #f8fafc;
 }
 
 /* Header Section */
 .climb-header {
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .header-content {
@@ -75,6 +75,10 @@
 }
 
 /* Export Button */
+.export-container {
+  position: relative;
+}
+
 .export-btn {
   display: flex;
   align-items: center;
@@ -92,6 +96,61 @@
 
 .export-btn:hover {
   background: #059669;
+}
+
+/* Export Dropdown */
+.export-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1000;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  min-width: 200px;
+  overflow: hidden;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.export-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  background: #ffffff;
+  border: none;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.export-option:hover {
+  background: #f3f4f6;
+}
+
+.export-option svg {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.export-option:first-child {
+  border-bottom: 1px solid #f3f4f6;
 }
 
 /* Request Management Card */

@@ -13,10 +13,13 @@
   border-bottom: 1px solid #e2e8f0;
   padding: 0 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 1000;
   min-height: var(--header-height);
+  height: var(--header-height);
 }
 
 .header-content {
@@ -25,7 +28,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 8px 24px 8px 8px;
+  height: 100%;
 }
 
 .header-actions { display: flex; align-items: center; gap: 16px; }
@@ -117,10 +121,12 @@
 .modal-actions { padding: 12px 18px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; }
 
 .dashboard-logo {
-  max-width: 160px;
+  max-width: 220px;
   height: auto;
+  max-height: 55px;
   margin: 0;
   display: block;
+  object-fit: contain;
 }
 
 .dashboard-header h1 {
@@ -198,11 +204,16 @@
   height: calc(100vh - var(--header-height));
   overflow: auto; /* only main scrolls */
   max-width: 100%;
-  padding: 15px 20px;
+  padding: 24px 32px 0 32px;
+  background: #f8fafc;
 }
 
-.dashboard-main h1 { color: 
-  #0c2915; font-size: 28px; font-weight: 700; margin: 0 0 12px 0; }
+.dashboard-main h1 { 
+  color: #0c2915; 
+  font-size: 32px; 
+  font-weight: 700; 
+  margin: 0 0 24px 0; 
+}
 
 /* Trek Activity section */
 .trek-activity-card { 

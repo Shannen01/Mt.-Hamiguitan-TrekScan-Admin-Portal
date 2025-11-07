@@ -50,50 +50,6 @@ function AppLayout({ onLogout }) {
       <header className="dashboard-header">
         <div className="header-content">
           <img src={logoImage} alt="TrekScan+ Admin Portal" className="dashboard-logo" />
-          <div className="header-actions" ref={actionsRef}>
-            <Button variant="outlined" startIcon={<CalendarToday fontSize="small" />}>Today</Button>
-            <Tooltip title="Notifications">
-              <IconButton className="icon-btn has-dot" aria-label="Notifications">
-                <NotificationsIcon />
-                <span className="badge-dot" aria-hidden="true"></span>
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Account">
-              <IconButton
-                className="icon-btn"
-                aria-label="Account"
-                onClick={(e) => { setMenuAnchor(e.currentTarget); setIsAccountOpen(true); }}
-                aria-haspopup="menu"
-                aria-expanded={isAccountOpen}
-              >
-                <AccountCircle />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Toggle theme">
-              <IconButton className="icon-btn" aria-label="Toggle theme">
-                <DarkModeIcon />
-              </IconButton>
-            </Tooltip>
-
-            <Menu
-              anchorEl={menuAnchor}
-              open={Boolean(menuAnchor)}
-              onClose={() => { setIsAccountOpen(false); setMenuAnchor(null); }}
-            >
-              <MenuItem onClick={() => { setIsAccountOpen(false); setMenuAnchor(null); setOpenModal('profile'); }}>
-                <ListItemIcon><AccountCircle fontSize="small" /></ListItemIcon>
-                Profile
-              </MenuItem>
-              <MenuItem onClick={() => { setIsAccountOpen(false); setMenuAnchor(null); setOpenModal('settings'); }}>
-                <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
-                Settings
-              </MenuItem>
-              <MenuItem onClick={() => { setIsAccountOpen(false); setMenuAnchor(null); if (onLogout) onLogout(); }}>
-                <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
-                Logout
-              </MenuItem>
-            </Menu>
-          </div>
         </div>
       </header>
 

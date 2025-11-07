@@ -1,7 +1,7 @@
 import React from 'react';
 import '../style/EventManagement.css';
 
-function UserManagement() {
+function EventManagement() {
   return (
     <div className="dashboard-container">
       <main className="users-main">

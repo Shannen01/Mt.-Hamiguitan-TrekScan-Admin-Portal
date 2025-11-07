@@ -141,9 +141,8 @@ function Dashboard() {
   );
 
   return (
-    <div className="dashboard-container">
-      <main className="dashboard-main">
-        <h1>Dashboard</h1>
+    <>
+      <h1>Dashboard</h1>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
           <StatsCard
             title="Active Climbs Today"
@@ -363,8 +362,7 @@ function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </>
   );
 }
 
