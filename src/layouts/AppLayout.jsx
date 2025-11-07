@@ -7,7 +7,7 @@ import { CalendarToday, AccountCircle, Settings as SettingsIcon, Logout as Logou
 
 import Dashboard from '../views/pages/Dashboard.jsx';
 import ClimbRequest from '../views/pages/ClimbRequest.jsx';
-import UserManagement from '../views/pages/UserManagement.jsx';
+import EventManagement from '../views/pages/EventManagement.jsx';
 import Reports from '../views/pages/Reports.jsx';
 
 function AppLayout({ onLogout }) {
@@ -123,7 +123,7 @@ function AppLayout({ onLogout }) {
               onClick={(e) => { e.preventDefault(); setActiveItem('users'); }}
             >
               <Users size={18} strokeWidth={2} className="icon" aria-hidden="true" />
-              <span>User Management</span>
+              <span>Event Management</span>
             </a>
             <a
               className={`nav-item${activeItem === 'reports' ? ' active' : ''}`}
@@ -139,7 +139,7 @@ function AppLayout({ onLogout }) {
         <main className="dashboard-main">
           {activeItem === 'dashboard' && <Dashboard />}
           {activeItem === 'climb' && <ClimbRequest />}
-          {activeItem === 'users' && <UserManagement />}
+          {activeItem === 'users' && <EventManagement />}
           {activeItem === 'reports' && <Reports />}
         </main>
       </div>

@@ -1,16 +1,16 @@
 import React from 'react';
-import '../style/UserManagement.css';
+import '../style/EventManagement.css';
 
 function UserManagement() {
   return (
     <div className="dashboard-container">
       <main className="users-main">
-        <h1>User Management</h1>
+        <h1>Event Management</h1>
       </main>
     </div>
   );
 }
 
-export default UserManagement;
+export default EventManagement;
 
 
