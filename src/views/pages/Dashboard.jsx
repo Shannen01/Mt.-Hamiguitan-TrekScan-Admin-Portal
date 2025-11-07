@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, Box, Typography, LinearProgress } from '@mui/material';
 
-function Dashboard() {
+function Dashboard({ onNavigate }) {
   // Generate dates from Sep 11 to Oct 10 with realistic trekking groups
   const generateTrekActivity = React.useCallback(() => {
     const days = [];
@@ -311,7 +311,7 @@ function Dashboard() {
                   Climbs scheduled for the next 7 days
                 </Typography>
               </div>
-              <button className="view-all-btn">VIEW ALL</button>
+              <button className="view-all-btn" onClick={() => onNavigate && onNavigate('climb')}>VIEW ALL</button>
             </div>
             
             <div className="climbs-tabs">

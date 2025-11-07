@@ -93,7 +93,7 @@ function AppLayout({ onLogout }) {
         </aside>
 
         <main className="dashboard-main">
-          {activeItem === 'dashboard' && <Dashboard />}
+          {activeItem === 'dashboard' && <Dashboard onNavigate={setActiveItem} />}
           {activeItem === 'climb' && <ClimbRequest />}
           {activeItem === 'users' && <EventManagement />}
           {activeItem === 'reports' && <Reports />}
