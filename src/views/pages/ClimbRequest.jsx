@@ -117,10 +117,9 @@ function ClimbRequest() {
   );
 
   return (
-    <div className="dashboard-container">
-      <main className="climb-main">
-        {/* Header Section */}
-        <div className="climb-header">
+    <>
+      {/* Header Section */}
+      <div className="climb-header">
           <div className="header-content">
             <div className="header-text">
               <h1>Climb Request</h1>
@@ -460,8 +459,7 @@ function ClimbRequest() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+    </>
   );
 }
 
