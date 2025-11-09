@@ -264,8 +264,8 @@ function ClimbRequest() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRequests.map((request, index) => (
-                  <tr key={request.id} className={index % 2 === 0 ? 'highlighted-row' : ''}>
+                {filteredRequests.map((request) => (
+                  <tr key={request.id}>
                     <td className="request-id">{request.id}</td>
                     <td>{request.name}</td>
                     <td>{request.requestedDate}</td>

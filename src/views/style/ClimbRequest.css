@@ -207,20 +207,12 @@
   background: #f9fafb;
 }
 
-/* Highlighted row (alternating rows) */
-.highlighted-row {
-  background: #fef3c7 !important;
-}
-
-.highlighted-row:hover {
-  background: #fde68a !important;
-}
-
-.requests-table tbody tr:not(.highlighted-row) {
+/* Table rows */
+.requests-table tbody tr {
   background: white;
 }
 
-.requests-table tbody tr:not(.highlighted-row):hover {
+.requests-table tbody tr:hover {
   background: #f9fafb;
 }
 
@@ -232,27 +224,50 @@
 
 /* Status Badge */
 .status-badge {
-  display: inline-block;
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
   border-radius: 9999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
+  width: 80px;
+  text-align: center;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-badge.pending {
-  background: #fbbf24;
+  background: #efd52d;
   color: white;
+  border-radius: 0.5rem;
+  padding: 6px 8px;
+  font-size: 11px;
+  width: 80px;
+  text-align: center;
 }
 
 .status-badge.approved {
   background: #10b981;
   color: white;
+  border-radius: 0.5rem;
+  padding: 6px 8px;
+  font-size: 11px;
+  width: 80px;
+  text-align: center;
 }
 
 .status-badge.rejected {
   background: #ef4444;
   color: white;
+  border-radius: 0.5rem;
+  padding: 6px 8px;
+  font-size: 11px;
+  width: 80px;
+  text-align: center;
 }
 
 /* View Details Button */
@@ -261,7 +276,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: #3A451E;
+  background: #10b981;;
   color: white;
   border: none;
   padding: 8px 16px;
@@ -273,9 +288,9 @@
 }
 
 .view-details-btn:hover {
-  background: #2d3517;
+  background: #2d3748;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(58, 69, 30, 0.3);
+  box-shadow: 0 2px 8px rgba(45, 55, 72, 0.3);
 }
 
 .view-details-btn:active {
