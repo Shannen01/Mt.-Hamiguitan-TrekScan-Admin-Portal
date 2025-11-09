@@ -173,82 +173,10 @@ function ClimbRequest() {
   );
 
   return (
-    <>
-      {/* Header Section */}
-      <div className="climb-header">
-          <div className="header-content">
-            <div className="header-text">
-              <h1>Climb Request</h1>
-              <p className="header-subtitle">Review and manage climb requests from users</p>
-            </div>
-            <div className="header-actions">
-              <div className="search-container">
-                <input
-                  type="text"
-                  placeholder="Search requests..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="search-input"
-                />
-                <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M21 21L16.514 16.506M19 10.5C19 15.194 15.194 19 10.5 19S2 15.194 2 10.5 5.806 2 10.5 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <div className="export-container">
-                <button 
-                  className="export-btn"
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 15L12 3M12 15L8 11M12 15L16 11M2 17L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Export
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-                {showExportMenu && (
-                  <div className="export-dropdown">
-                    <button 
-                      className="export-option"
-                      onClick={() => {
-                        console.log('Exporting to PDF...');
-                        setShowExportMenu(false);
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Export as PDF
-                    </button>
-                    <button 
-                      className="export-option"
-                      onClick={() => {
-                        console.log('Exporting to Excel...');
-                        setShowExportMenu(false);
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <polyline points="10,9 9,9 8,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Export as Excel
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
+    <div className="climb-main">
         {/* Request Management Card */}
         <div className="request-management-card">
           <div className="card-header">
-            <h2>Request Management</h2>
           </div>
           
           <div className="table-container">
@@ -330,8 +258,8 @@ function ClimbRequest() {
                 <form className="request-details-form">
                   {/* Requester Information Section */}
                   <div className="requester-section">
-                    <div className="section-title-blue">
-                      <div className="section-line-blue"></div>
+                    <div className="section-title-green">
+                      <div className="section-line-green"></div>
                       <h4>Requester Information</h4>
                     </div>
                     
@@ -422,8 +350,8 @@ function ClimbRequest() {
 
                   {/* Documents Section */}
                   <div className="documents-section">
-                    <div className="section-title-blue">
-                      <div className="section-line-blue"></div>
+                    <div className="section-title-green">
+                      <div className="section-line-green"></div>
                       <h4>Documents</h4>
                     </div>
                     <div className="file-drop-zone">
@@ -508,7 +436,7 @@ function ClimbRequest() {
             </div>
           </div>
         )}
-    </>
+    </div>
   );
 }
 

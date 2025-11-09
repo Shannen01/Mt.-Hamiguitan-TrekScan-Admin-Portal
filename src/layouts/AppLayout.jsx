@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../views/style/Dashboard.css';
-import logoImage from '../assets/Logo_admin_portal.png';
+import logoImage from '../assets/TrekScan.png';
 import { Home, Mountain, Users, BarChart3 } from 'lucide-react';
 import { Button, IconButton, Menu, MenuItem, ListItemIcon, Tooltip } from '@mui/material';
 import { CalendarToday, AccountCircle, Settings as SettingsIcon, Logout as LogoutIcon, Notifications as NotificationsIcon, DarkMode as DarkModeIcon } from '@mui/icons-material';
@@ -47,15 +47,13 @@ function AppLayout({ onLogout }) {
 
   return (
     <div className="dashboard-container">
-      <header className="dashboard-header">
-        <div className="header-content">
-          <img src={logoImage} alt="TrekScan+ Admin Portal" className="dashboard-logo" />
-        </div>
-      </header>
-
       <div className="dashboard-body">
         <aside className="sidebar">
-          <div className="sidebar-header"></div>
+          <div className="sidebar-header">
+            <div className="sidebar-logo-container">
+              <img src={logoImage} alt="TrekScan+ Admin Portal" className="sidebar-logo" />
+            </div>
+          </div>
           <nav className="sidebar-nav">
             <a
               className={`nav-item${activeItem === 'dashboard' ? ' active' : ''}`}
@@ -93,6 +91,35 @@ function AppLayout({ onLogout }) {
         </aside>
 
         <main className="dashboard-main">
+          <header className="main-content-header">
+            <div className="header-left">
+              <h1 className="page-title">Request Management</h1>
+            </div>
+            <div className="header-content">
+              <div className="header-right">
+                <div className="notification-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="notification-badge"></span>
+                </div>
+                <div className="header-separator"></div>
+                <div className="user-info-header">
+                  <div className="user-text">
+                    <div className="user-name">Admin User</div>
+                    <div className="user-role">Administrator</div>
+                  </div>
+                  <div className="user-avatar">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
           {activeItem === 'dashboard' && <Dashboard onNavigate={setActiveItem} />}
           {activeItem === 'climb' && <ClimbRequest />}
           {activeItem === 'users' && <EventManagement />}
