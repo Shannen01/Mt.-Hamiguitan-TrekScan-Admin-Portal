@@ -6,7 +6,7 @@
 .reports-main { 
   height: auto; 
   max-width: 100%; 
-  padding: 24px 32px 0 32px;
+  padding: 24px 32px 300px 32px;
   padding-top: calc(var(--header-height) + 24px);
 }
 .reports-main h1 { color: #0c2915; font-size: 32px; font-weight: 700; margin: 0 0 24px 0; }

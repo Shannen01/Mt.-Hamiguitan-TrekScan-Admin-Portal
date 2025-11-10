@@ -88,6 +88,7 @@ function Dashboard({ onNavigate }) {
 
   const [hover, setHover] = React.useState(null);
   const [activeTab, setActiveTab] = React.useState('upcoming'); // 'upcoming' or 'recent'
+  const [trekkerSearch, setTrekkerSearch] = React.useState('');
 
   // Data for upcoming climbs
   const upcomingClimbs = [
@@ -141,8 +142,7 @@ function Dashboard({ onNavigate }) {
   );
 
   return (
-    <>
-      <h1>Dashboard</h1>
+    <div style={{ paddingTop: '24px', paddingLeft: '32px', paddingRight: '32px', paddingBottom: '300px' }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
           <StatsCard
             title="Active Climbs Today"
@@ -268,32 +268,36 @@ function Dashboard({ onNavigate }) {
               <Typography variant="h6" component="h2" className="todays-trekkers-title">
                 Today's Trekkers
               </Typography>
-              <Typography variant="body2" className="todays-trekkers-subtitle">
-                Trekkers date of climb today
-              </Typography>
               
-              <div className="trekkers-dropdown">
-                <select className="trekkers-select">
-                  <option value="">Trekkers' Name</option>
-                  <option value="juan-dela-cruz">Juan Dela Cruz</option>
-                  <option value="juan-tom-od">Juan Tom-od</option>
-                  <option value="wa-ethil">Wa Ethil</option>
-                </select>
+              <div className="trekkers-search">
+                <input
+                  type="text"
+                  className="trekkers-search-input"
+                  placeholder="Search trekkers..."
+                  value={trekkerSearch}
+                  onChange={(e) => setTrekkerSearch(e.target.value)}
+                />
               </div>
               
               <div className="trekkers-list">
-                <div className="trekker-item">
-                  <span className="trekker-number">1.</span>
-                  <span className="trekker-name">Juan Dela Cruz</span>
-                </div>
-                <div className="trekker-item">
-                  <span className="trekker-number">2.</span>
-                  <span className="trekker-name">Juan Tom-od</span>
-                </div>
-                <div className="trekker-item">
-                  <span className="trekker-number">3.</span>
-                  <span className="trekker-name">Wa Ethil</span>
-                </div>
+                {[
+                  { id: 'juan-dela-cruz', name: 'Juan Dela Cruz', number: 1 },
+                  { id: 'juan-tom-od', name: 'Juan Tom-od', number: 2 },
+                  { id: 'wa-ethil', name: 'Wa Ethil', number: 3 },
+                  { id: 'maria-santos', name: 'Maria Santos', number: 4 },
+                  { id: 'pedro-rodriguez', name: 'Pedro Rodriguez', number: 5 },
+                  { id: 'ana-garcia', name: 'Ana Garcia', number: 6 }
+                ]
+                  .filter(trekker => 
+                    !trekkerSearch || 
+                    trekker.name.toLowerCase().includes(trekkerSearch.toLowerCase())
+                  )
+                  .map((trekker) => (
+                    <div key={trekker.id} className="trekker-item">
+                      <span className="trekker-number">{trekker.number}.</span>
+                      <span className="trekker-name">{trekker.name}</span>
+                    </div>
+                  ))}
               </div>
             </CardContent>
           </Card>
@@ -362,7 +366,7 @@ function Dashboard({ onNavigate }) {
             </div>
           </CardContent>
         </Card>
-      </>
+      </div>
   );
 }
 

@@ -2,7 +2,7 @@
 .climb-main { 
   height: auto;
   max-width: 100%; 
-  padding: 24px 32px 0 32px;
+  padding: 24px 32px 300px 32px;
   background: #f8fafc;
   flex: 1;
 }
@@ -690,7 +690,7 @@
 .section-line-blue {
   width: 4px;
   height: 24px;
-  background: #3b82f6;
+  background: #10b981;
   border-radius: 2px;
 }
 
@@ -757,7 +757,7 @@
 
 .form-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #10b981;
   background: white;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
@@ -772,7 +772,7 @@
   border-color: #e1e5e9;
   background: #f3f4f6 !important;
   box-shadow: none;
-}
+}#6cbca
 
 .form-select {
   appearance: none;
@@ -800,7 +800,7 @@
 }
 
 .file-drop-zone:hover {
-  border-color: #6cbca2;
+  border-color: 2;
   background: #d1fae5;
 }
 
