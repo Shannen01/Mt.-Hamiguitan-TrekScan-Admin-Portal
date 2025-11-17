@@ -154,17 +154,66 @@ function Reports() {
     return { bookingValues, cancellationValues };
   }, [values]);
 
-  // Bar chart dimensions
-  const barChartWidth = 900;
-  const barChartHeight = 300;
-  const barPadding = { top: 30, right: 24, bottom: 40, left: 44 };
-  const barInnerW = barChartWidth - barPadding.left - barPadding.right;
-  const barInnerH = barChartHeight - barPadding.top - barPadding.bottom;
-  const barMaxY = Math.max(...bookingData.bookingValues, ...bookingData.cancellationValues, 1) * 1.2;
+  // Bar chart dimensions and calculations - memoized for performance
+  const barChartConfig = useMemo(() => {
+    const barChartWidth = 900;
+    const barChartHeight = 300;
+    const barPadding = { top: 30, right: 24, bottom: 40, left: 44 };
+    const barInnerW = barChartWidth - barPadding.left - barPadding.right;
+    const barInnerH = barChartHeight - barPadding.top - barPadding.bottom;
+    
+    // Calculate max Y value with proper scaling
+    const allValues = [...bookingData.bookingValues, ...bookingData.cancellationValues];
+    const maxValue = Math.max(...allValues, 1);
+    const barMaxY = maxValue > 0 ? Math.ceil(maxValue * 1.2) : 10;
+    
+    // Calculate bar positioning - works for any number of data points
+    const numBars = values.length;
+    const barGroupSpacing = numBars > 1 ? barInnerW / numBars : barInnerW;
+    const barGroupWidth = Math.min(barGroupSpacing * 0.7, 40); // Max width per group, adaptive spacing
+    
+    const barXAt = (i) => {
+      if (numBars === 1) {
+        return barPadding.left + barInnerW / 2;
+      }
+      return barPadding.left + (i * barGroupSpacing) + (barGroupSpacing / 2);
+    };
+    
+    const barYAt = (v) => {
+      if (barMaxY === 0) return barPadding.top + barInnerH;
+      return barPadding.top + barInnerH - (v / barMaxY) * barInnerH;
+    };
+    
+    // Calculate individual bar width (two bars per group: booking + cancellation)
+    const barWidth = Math.max(barGroupWidth * 0.35, 8); // Each bar is 35% of group width, min 8px
+    const barGap = Math.max(barGroupWidth * 0.1, 2); // Gap between booking and cancellation bars
+    
+    return {
+      barChartWidth,
+      barChartHeight,
+      barPadding,
+      barInnerW,
+      barInnerH,
+      barMaxY,
+      barXAt,
+      barYAt,
+      barWidth,
+      barGap
+    };
+  }, [values, bookingData]);
 
-  const barXAt = (i) => barPadding.left + (i * barInnerW) / (values.length - 1 || 1);
-  const barYAt = (v) => barPadding.top + barInnerH - (v / barMaxY) * barInnerH;
-  const barWidth = barInnerW / (values.length * 2.5);
+  const {
+    barChartWidth,
+    barChartHeight,
+    barPadding,
+    barInnerW,
+    barInnerH,
+    barMaxY,
+    barXAt,
+    barYAt,
+    barWidth,
+    barGap
+  } = barChartConfig;
 
 
   // Prepare export data
@@ -524,48 +573,69 @@ function Reports() {
                       </g>
                     );
                   })}
+                  
+                  {/* Y-axis label */}
+                  <text 
+                    x={barPadding.left - 35} 
+                    y={barPadding.top + barInnerH / 2} 
+                    textAnchor="middle" 
+                    className="axis-text"
+                    transform={`rotate(-90 ${barPadding.left - 35} ${barPadding.top + barInnerH / 2})`}
+                    style={{ fontSize: '12px', fill: '#6b7280' }}
+                  >
+                    Count
+                  </text>
 
                   {/* Bars */}
                   {values.map((_, i) => {
-                    const bookingHeight = barInnerH - (barYAt(bookingData.bookingValues[i]) - barPadding.top);
-                    const cancelHeight = barInnerH - (barYAt(bookingData.cancellationValues[i]) - barPadding.top);
-                    const x = barXAt(i) - barWidth / 2;
+                    const bookingValue = bookingData.bookingValues[i] || 0;
+                    const cancelValue = bookingData.cancellationValues[i] || 0;
+                    
+                    const bookingY = barYAt(bookingValue);
+                    const cancelY = barYAt(cancelValue);
+                    const baseY = barPadding.top + barInnerH;
+                    
+                    const bookingHeight = Math.max(baseY - bookingY, 0);
+                    const cancelHeight = Math.max(baseY - cancelY, 0);
+                    
                     const centerX = barXAt(i);
+                    const bookingX = centerX - barWidth - (barGap / 2);
+                    const cancelX = centerX + (barGap / 2);
 
                     return (
                       <g key={`bars-${i}`}>
                         {/* Booking bar */}
                         <rect
-                          x={x}
-                          y={barYAt(bookingData.bookingValues[i])}
-                          width={barWidth * 0.8}
+                          x={bookingX}
+                          y={bookingY}
+                          width={barWidth}
                           height={bookingHeight}
                           fill="#30622f"
                           rx="2"
                           onMouseEnter={() => setBarHover({ 
                             x: centerX, 
-                            y: barYAt(bookingData.bookingValues[i]) - 10,
+                            y: bookingY - 10,
                             period: days[i],
-                            bookings: bookingData.bookingValues[i],
-                            cancellations: bookingData.cancellationValues[i]
+                            bookings: bookingValue,
+                            cancellations: cancelValue
                           })}
                           onMouseLeave={() => setBarHover(null)}
                           style={{ cursor: 'pointer' }}
                         />
                         {/* Cancellation bar */}
                         <rect
-                          x={x + barWidth * 0.8 + 2}
-                          y={barYAt(bookingData.cancellationValues[i])}
-                          width={barWidth * 0.8}
+                          x={cancelX}
+                          y={cancelY}
+                          width={barWidth}
                           height={cancelHeight}
                           fill="#ef4444"
                           rx="2"
                           onMouseEnter={() => setBarHover({ 
                             x: centerX, 
-                            y: barYAt(bookingData.cancellationValues[i]) - 10,
+                            y: cancelY - 10,
                             period: days[i],
-                            bookings: bookingData.bookingValues[i],
-                            cancellations: bookingData.cancellationValues[i]
+                            bookings: bookingValue,
+                            cancellations: cancelValue
                           })}
                           onMouseLeave={() => setBarHover(null)}
                           style={{ cursor: 'pointer' }}
@@ -574,11 +644,42 @@ function Reports() {
                     );
                   })}
 
-                  {/* X axis labels */}
+                  {/* X axis labels - adaptive spacing based on number of data points */}
                   {days.map((d, i) => {
-                    if (i % Math.ceil(days.length / 8) === 0 || i === days.length - 1) {
+                    // For daily (7 days): show all
+                    // For weekly (7 weeks): show all or every other
+                    // For monthly (12 months): show every 2-3 months
+                    // For custom: show reasonable number based on total count
+                    let showLabel = false;
+                    const totalDays = days.length;
+                    
+                    if (totalDays <= 7) {
+                      // Show all labels for 7 or fewer data points
+                      showLabel = true;
+                    } else if (totalDays <= 14) {
+                      // Show every other label
+                      showLabel = i % 2 === 0 || i === totalDays - 1;
+                    } else if (totalDays <= 30) {
+                      // Show every 3rd label, plus first and last
+                      showLabel = i % 3 === 0 || i === 0 || i === totalDays - 1;
+                    } else {
+                      // Show approximately 10-12 labels
+                      const step = Math.ceil(totalDays / 12);
+                      showLabel = i % step === 0 || i === 0 || i === totalDays - 1;
+                    }
+                    
+                    if (showLabel) {
                       return (
-                        <text key={`bar-x-${i}`} x={barXAt(i)} y={barChartHeight - 8} textAnchor="middle" className="axis-text">{d}</text>
+                        <text 
+                          key={`bar-x-${i}`} 
+                          x={barXAt(i)} 
+                          y={barChartHeight - 8} 
+                          textAnchor="middle" 
+                          className="axis-text"
+                          style={{ fontSize: totalDays > 20 ? '10px' : '12px' }}
+                        >
+                          {d}
+                        </text>
                       );
                     }
                     return null;

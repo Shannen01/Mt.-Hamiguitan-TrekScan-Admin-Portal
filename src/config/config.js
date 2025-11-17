@@ -20,6 +20,12 @@ export const config = {
   auth: {
     tokenKey: 'trekscan_auth',
     refreshThreshold: 5 * 60 * 1000, // 5 minutes before expiry
+  },
+  
+  // Firebase Configuration
+  firebase: {
+    enabled: Boolean(import.meta.env.VITE_FIREBASE_API_KEY),
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
   }
 };
 

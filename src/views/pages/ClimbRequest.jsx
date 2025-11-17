@@ -1,5 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import '../style/ClimbRequest.css';
+import { 
+  getAllBookings, 
+  getBookingById, 
+  updateBookingStatus,
+  searchBookings,
+  subscribeToBookings,
+  formatBookingDate
+} from '../../services/bookingService';
+import { getUserById } from '../../services/userService';
+import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
+import Attachment from '../../models/Attachment';
 
 function ClimbRequest() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -9,7 +20,10 @@ function ClimbRequest() {
   const [showFiltersMenu, setShowFiltersMenu] = useState(false);
   const [showMonthMenu, setShowMonthMenu] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedMonth, setSelectedMonth] = useState('this-month');
+  const [selectedMonth, setSelectedMonth] = useState('all-time'); // Changed to 'all-time' to show all bookings by default
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   
   const filtersRef = useRef(null);
   const exportRef = useRef(null);
@@ -26,119 +40,329 @@ function ClimbRequest() {
   });
   const [adminNote, setAdminNote] = useState('');
 
-  // Sample data for climb requests
-  const [requests, setRequests] = useState([
-    {
-      id: 'REQ-001',
-      name: 'John Smith',
-      requestedDate: '6/15/2025',
-      dateSubmitted: '5/10/2025',
-      status: 'Pending',
-      email: 'john.smith@email.com',
-      phone: '+1 (555) 123-4567',
-      emergencyContact: 'Jane Smith - +1 (555) 987-6543',
-      experience: 'Intermediate',
-      groupSize: '2 people',
-      specialRequests: 'Vegetarian meals preferred'
-    },
-    {
-      id: 'REQ-002',
-      name: 'John Smooth',
-      requestedDate: '6/15/2025',
-      dateSubmitted: '5/10/2025',
-      status: 'Pending',
-      email: 'john.smooth@email.com',
-      phone: '+1 (555) 234-5678',
-      emergencyContact: 'Mary Smooth - +1 (555) 876-5432',
-      experience: 'Beginner',
-      groupSize: '1 person',
-      specialRequests: 'None'
-    },
-    {
-      id: 'REQ-003',
-      name: 'John Sim',
-      requestedDate: '6/15/2025',
-      dateSubmitted: '5/10/2025',
-      status: 'Pending',
-      email: 'john.sim@email.com',
-      phone: '+1 (555) 345-6789',
-      emergencyContact: 'Bob Sim - +1 (555) 765-4321',
-      experience: 'Advanced',
-      groupSize: '3 people',
-      specialRequests: 'Early morning departure'
-    },
-    {
-      id: 'REQ-004',
-      name: 'John Smile',
-      requestedDate: '6/15/2025',
-      dateSubmitted: '5/10/2025',
-      status: 'Pending',
-      email: 'john.smile@email.com',
-      phone: '+1 (555) 456-7890',
-      emergencyContact: 'Alice Smile - +1 (555) 654-3210',
-      experience: 'Intermediate',
-      groupSize: '2 people',
-      specialRequests: 'Photography equipment'
-    },
-    {
-      id: 'REQ-005',
-      name: 'John Shy',
-      requestedDate: '6/15/2025',
-      dateSubmitted: '5/10/2025',
-      status: 'Pending',
-      email: 'john.shy@email.com',
-      phone: '+1 (555) 567-8901',
-      emergencyContact: 'Tom Shy - +1 (555) 543-2109',
-      experience: 'Beginner',
-      groupSize: '1 person',
-      specialRequests: 'Quiet accommodation'
-    },
-    {
-      id: 'REQ-006',
-      name: 'John Shine',
-      requestedDate: '6/15/2025',
-      dateSubmitted: '5/10/2025',
-      status: 'Pending',
-      email: 'john.shine@email.com',
-      phone: '+1 (555) 678-9012',
-      emergencyContact: 'Lisa Shine - +1 (555) 432-1098',
-      experience: 'Expert',
-      groupSize: '4 people',
-      specialRequests: 'Professional guide requested'
-    }
-  ]);
+  // Climb requests from Firebase
+  const [requests, setRequests] = useState([]);
 
-  const handleActionClick = (requestId, action) => {
-    if (action === 'view') {
-      const request = requests.find(req => req.id === requestId);
-      setSelectedRequest(request);
-      // Populate form with request data
-      setFormData({
-        fullName: request.name || '',
-        phoneNumber: request.phone || '',
-        age: '',
-        email: request.email || '',
-        affiliation: '',
-        numberOfPorters: '',
-        purposeOfClimb: ''
-      });
-      setUploadedFiles([]);
-      setAdminNote('');
-      setShowDetailsModal(true);
-    } else if (action === 'approve' || action === 'reject' || action === 'pending') {
-      setRequests(prevRequests => 
-        prevRequests.map(request => 
-          request.id === requestId 
-            ? { ...request, status: action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : 'Pending' }
-            : request
-        )
+  // Fetch bookings from Firebase and map to UI format
+  const fetchClimbRequests = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Fetching bookings with filters:', { selectedStatus, selectedMonth });
+      
+      const filters = {
+        status: selectedStatus !== 'all' ? selectedStatus.toLowerCase() : null
+      };
+      
+      // Add month filter if needed
+      if (selectedMonth !== 'all-time') {
+        const now = new Date();
+        if (selectedMonth === 'this-month') {
+          filters.month = now.getMonth() + 1;
+          filters.year = now.getFullYear();
+        } else if (selectedMonth === 'last-month') {
+          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+          filters.month = lastMonth.getMonth() + 1;
+          filters.year = lastMonth.getFullYear();
+        } else if (selectedMonth === 'this-year') {
+          filters.year = now.getFullYear();
+        }
+      }
+      
+      console.log('Calling getAllBookings with filters:', filters);
+      let fetchedBookings = await getAllBookings(filters);
+      console.log('Fetched bookings:', fetchedBookings?.length || 0, fetchedBookings);
+      
+      // Apply search filter if search term exists
+      if (searchTerm) {
+        console.log('Applying search filter:', searchTerm);
+        fetchedBookings = await searchBookings(searchTerm, filters);
+        console.log('After search, bookings:', fetchedBookings?.length || 0);
+      }
+      
+      if (!fetchedBookings || fetchedBookings.length === 0) {
+        console.log('No bookings found');
+        setRequests([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Fetch user data for each booking and map to UI format
+      console.log('Processing bookings and fetching user data...');
+      const requestsWithUserData = await Promise.all(
+        fetchedBookings.map(async (booking) => {
+          try {
+            // Fetch user data
+            const user = booking.userId ? await getUserById(booking.userId) : null;
+            
+            // Map BookingModel to UI format
+            return {
+              id: booking.id,
+              requestId: booking.id,
+              userId: booking.userId,
+              name: user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User',
+              email: user?.email || 'N/A',
+              phone: 'N/A', // UserModel doesn't have phone, might need to add
+              phoneNumber: 'N/A',
+              age: user?.birthDate ? calculateAge(user.birthDate) : 'N/A',
+              affiliation: booking.affiliation || 'N/A',
+              numberOfPorters: booking.numberOfPorters || 0,
+              purposeOfClimb: booking.notes || booking.trekType || 'N/A',
+              requestedDate: formatBookingDate(booking.trekDate, 'short'),
+              dateSubmitted: formatBookingDate(booking.createdAt, 'short'),
+              status: capitalizeStatus(booking.status),
+              documents: booking.attachments || [],
+              attachments: booking.attachments || [],
+              adminNotes: booking.adminNotes || '',
+              lastAdminNote: booking.adminNotes || '',
+              trekType: booking.trekType,
+              // Keep original booking for reference
+              _booking: booking
+            };
+          } catch (userErr) {
+            console.error('Error processing booking:', booking.id, userErr);
+            // Return booking even if user fetch fails
+            return {
+              id: booking.id,
+              requestId: booking.id,
+              userId: booking.userId,
+              name: 'Unknown User',
+              email: 'N/A',
+              phone: 'N/A',
+              phoneNumber: 'N/A',
+              age: 'N/A',
+              affiliation: booking.affiliation || 'N/A',
+              numberOfPorters: booking.numberOfPorters || 0,
+              purposeOfClimb: booking.notes || booking.trekType || 'N/A',
+              requestedDate: formatBookingDate(booking.trekDate, 'short'),
+              dateSubmitted: formatBookingDate(booking.createdAt, 'short'),
+              status: capitalizeStatus(booking.status),
+              documents: booking.attachments || [],
+              attachments: booking.attachments || [],
+              adminNotes: booking.adminNotes || '',
+              lastAdminNote: booking.adminNotes || '',
+              trekType: booking.trekType,
+              _booking: booking
+            };
+          }
+        })
       );
+      
+      console.log('Mapped requests:', requestsWithUserData.length);
+      setRequests(requestsWithUserData);
+    } catch (err) {
+      console.error('Error fetching bookings:', err);
+      console.error('Error details:', err.message, err.stack);
+      setError(`Failed to load climb requests: ${err.message || 'Unknown error'}`);
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to calculate age from birthDate
+  const calculateAge = (birthDate) => {
+    if (!birthDate) return 'N/A';
+    try {
+      const birth = new Date(birthDate);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      return age.toString();
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  // Helper function to capitalize status for display
+  const capitalizeStatus = (status) => {
+    if (!status) return 'Pending';
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  };
+
+  // Check authentication and load requests on component mount and when filters change
+  useEffect(() => {
+    // Check if user is authenticated
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      setError('Please log in to view climb requests.');
+      setLoading(false);
+      return;
+    }
+
+    // Set up auth state listener
+    const unsubscribe = onAuthStateChange((user) => {
+      if (!user) {
+        setError('Session expired. Please log in again.');
+        setLoading(false);
+        setRequests([]);
+      } else {
+        // User is authenticated, fetch requests
+        fetchClimbRequests();
+      }
+    });
+
+    // Fetch requests if authenticated
+    if (currentUser) {
+      fetchClimbRequests();
+    }
+
+    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStatus, selectedMonth]);
+
+  const handleActionClick = async (requestId, action) => {
+    if (action === 'view') {
+      try {
+        setLoadingDetails(true);
+        console.log('Fetching booking details for:', requestId);
+        
+        if (!requestId) {
+          throw new Error('Request ID is missing');
+        }
+        
+        const booking = await getBookingById(requestId);
+        console.log('Booking fetched:', booking);
+        
+        if (!booking) {
+          throw new Error('Booking not found');
+        }
+        
+        // Fetch user data
+        const user = booking.userId ? await getUserById(booking.userId) : null;
+        console.log('User data:', user);
+        
+        // Map booking to UI format
+        const request = {
+          id: booking.id,
+          requestId: booking.id,
+          userId: booking.userId,
+          name: user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User',
+          email: user?.email || 'N/A',
+          phone: 'N/A',
+          phoneNumber: 'N/A',
+          age: user?.birthDate ? calculateAge(user.birthDate) : 'N/A',
+          affiliation: booking.affiliation || 'N/A',
+          numberOfPorters: booking.numberOfPorters || 0,
+          purposeOfClimb: booking.notes || booking.trekType || 'N/A',
+          requestedDate: formatBookingDate(booking.trekDate, 'short'),
+          dateSubmitted: formatBookingDate(booking.createdAt, 'short'),
+          status: capitalizeStatus(booking.status),
+          documents: booking.attachments || [],
+          attachments: booking.attachments || [],
+          adminNotes: booking.adminNotes || '',
+          lastAdminNote: booking.adminNotes || '',
+          trekType: booking.trekType,
+          _booking: booking
+        };
+        
+        setSelectedRequest({
+          ...request,
+          requestedDate: formatBookingDate(booking.trekDate, 'short'),
+          dateSubmitted: formatBookingDate(booking.createdAt, 'short')
+        });
+        
+        // Populate form with request data
+        setFormData({
+          fullName: request.name || '',
+          phoneNumber: request.phoneNumber || '',
+          age: request.age || '',
+          email: request.email || '',
+          affiliation: request.affiliation || '',
+          numberOfPorters: request.numberOfPorters ? String(request.numberOfPorters) : '',
+          purposeOfClimb: request.purposeOfClimb || ''
+        });
+        
+        // Map attachments to documents format for display
+        const documents = (booking.attachments || []).map(att => {
+          try {
+            // Handle both Attachment instances and plain objects
+            let attachment;
+            if (att instanceof Attachment) {
+              attachment = att;
+            } else if (att && typeof att === 'object') {
+              attachment = Attachment.fromMap(att);
+            } else {
+              // If att is just a string URL or something else
+              attachment = Attachment.fromMap({ downloadURL: att || '' });
+            }
+            
+            return {
+              name: attachment?.fileName || attachment?.name || 'Unknown',
+              fileName: attachment?.fileName || attachment?.name || 'Unknown',
+              url: attachment?.downloadURL || attachment?.url || '',
+              downloadURL: attachment?.downloadURL || attachment?.url || '',
+              type: attachment?.mimeType || attachment?.type || 'application/octet-stream',
+              mimeType: attachment?.mimeType || attachment?.type || 'application/octet-stream',
+              size: attachment?.size || 0
+            };
+          } catch (attErr) {
+            console.error('Error processing attachment:', att, attErr);
+            // Return a safe default
+            return {
+              name: 'Unknown',
+              fileName: 'Unknown',
+              url: att?.downloadURL || att?.url || '',
+              downloadURL: att?.downloadURL || att?.url || '',
+              type: 'application/octet-stream',
+              mimeType: 'application/octet-stream',
+              size: 0
+            };
+          }
+        });
+        setUploadedFiles(documents);
+        setAdminNote(booking.adminNotes || '');
+        console.log('Setting selected request and showing modal');
+        setShowDetailsModal(true);
+        setLoadingDetails(false);
+      } catch (err) {
+        console.error('Error fetching request details:', err);
+        console.error('Error stack:', err.stack);
+        setLoadingDetails(false);
+        alert(`Failed to load request details: ${err.message || 'Unknown error'}`);
+      }
+    } else if (action === 'approve' || action === 'reject' || action === 'pending') {
+      try {
+        // Map UI status to BookingModel status (lowercase)
+        const statusMap = {
+          'approve': 'approved',
+          'reject': 'rejected',
+          'pending': 'pending'
+        };
+        const bookingStatus = statusMap[action] || 'pending';
+        
+        await updateBookingStatus(requestId, bookingStatus);
+        
+        // Update local state with capitalized status for display
+        const displayStatus = capitalizeStatus(bookingStatus);
+        setRequests(prevRequests => 
+          prevRequests.map(request => 
+            request.id === requestId 
+              ? { ...request, status: displayStatus }
+              : request
+          )
+        );
+        
+        // Update selected request if modal is open
+        if (selectedRequest && selectedRequest.id === requestId) {
+          setSelectedRequest({ ...selectedRequest, status: displayStatus });
+        }
+      } catch (err) {
+        console.error('Error updating request status:', err);
+        alert('Failed to update request status. Please try again.');
+      }
     }
   };
 
   const handleFileOpen = (file) => {
-    if (file.url) {
-      window.open(file.url, '_blank');
+    // Handle both old format (file.url) and new format (file.downloadURL or file.url)
+    const url = file.downloadURL || file.url;
+    if (url) {
+      window.open(url, '_blank');
     }
   };
 
@@ -212,18 +436,49 @@ function ClimbRequest() {
     setShowMonthMenu(false);
   };
 
+  // Handle search with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm) {
+        fetchClimbRequests();
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
+
+  // Filter requests locally for search (or use the service)
   const filteredRequests = requests.filter(request => {
-    const matchesSearch = request.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.id.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!searchTerm) return true;
     
-    const matchesStatus = selectedStatus === 'all' || 
-      request.status.toLowerCase() === selectedStatus.toLowerCase();
-    
-    return matchesSearch && matchesStatus;
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return (
+      request.name?.toLowerCase().includes(lowerSearchTerm) ||
+      request.id?.toLowerCase().includes(lowerSearchTerm) ||
+      request.userId?.toLowerCase().includes(lowerSearchTerm) ||
+      request.email?.toLowerCase().includes(lowerSearchTerm) ||
+      request.requestId?.toLowerCase().includes(lowerSearchTerm) ||
+      request.affiliation?.toLowerCase().includes(lowerSearchTerm)
+    );
   });
 
   return (
     <div className="climb-main">
+        {/* Error Display */}
+        {error && (
+          <div style={{
+            padding: '12px 16px',
+            marginBottom: '16px',
+            backgroundColor: '#fee',
+            border: '1px solid #fcc',
+            borderRadius: '4px',
+            color: '#c33'
+          }}>
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+        
         {/* Request Management Card */}
         <div className="request-management-card">
           <div className="card-header">
@@ -329,7 +584,8 @@ function ClimbRequest() {
                 <button className="table-action-btn" onClick={() => setShowMonthMenu(!showMonthMenu)}>
                   {selectedMonth === 'this-month' ? 'This Month' : 
                    selectedMonth === 'last-month' ? 'Last Month' :
-                   selectedMonth === 'this-year' ? 'This Year' : 'This Month'}
+                   selectedMonth === 'this-year' ? 'This Year' : 
+                   selectedMonth === 'all-time' ? 'All Time' : 'All Time'}
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <polyline points="6 9 12 15 18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
@@ -398,23 +654,43 @@ function ClimbRequest() {
                 ) : (
                   filteredRequests.map((request) => (
                     <tr key={request.id}>
-                      <td className="request-id">{request.id}</td>
-                      <td>{request.name}</td>
-                      <td>{request.requestedDate}</td>
-                      <td>{request.dateSubmitted}</td>
+                      <td className="request-id">{request.requestId || request.id}</td>
+                      <td>{request.name || 'N/A'}</td>
+                      <td>{request.requestedDate || 'Not specified'}</td>
+                      <td>{request.dateSubmitted || 'Not specified'}</td>
                       <td>
-                        <span className={`status-badge ${request.status.toLowerCase()}`}>{request.status}</span>
+                        <span className={`status-badge ${(request.status || 'Pending').toLowerCase()}`}>
+                          {request.status || 'Pending'}
+                        </span>
                       </td>
                       <td>
                         <button 
                           className="view-details-btn"
-                          onClick={() => handleActionClick(request.id, 'view')}
+                          onClick={() => {
+                            console.log('View Details clicked for request:', request.id, request);
+                            handleActionClick(request.id, 'view');
+                          }}
+                          disabled={loadingDetails}
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" strokeWidth="2"/>
-                            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                          </svg>
-                          View Details
+                          {loadingDetails ? (
+                            <>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="spinning">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeDasharray="31.416" strokeDashoffset="31.416">
+                                  <animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416;0 31.416" repeatCount="indefinite"/>
+                                  <animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416;-31.416" repeatCount="indefinite"/>
+                                </circle>
+                              </svg>
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" strokeWidth="2"/>
+                                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                              </svg>
+                              View Details
+                            </>
+                          )}
                         </button>
                       </td>
                     </tr>
@@ -435,14 +711,7 @@ function ClimbRequest() {
                     <h3>Request Details</h3>
                     <span className="request-id-badge">{selectedRequest.id}</span>
                   </div>
-                  <p className="submission-date">Submitted on {(() => {
-                    const dateParts = selectedRequest.dateSubmitted.split('/');
-                    if (dateParts.length === 3) {
-                      const date = new Date(dateParts[2], dateParts[0] - 1, dateParts[1]);
-                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                    }
-                    return selectedRequest.dateSubmitted;
-                  })()}</p>
+                  <p className="submission-date">Submitted on {selectedRequest.dateSubmitted ? formatBookingDate(selectedRequest._booking?.createdAt || selectedRequest.dateSubmitted, 'long') : 'Not specified'}</p>
                 </div>
                 <div className="header-right">
                   <span className={`status-badge-modal ${selectedRequest.status.toLowerCase()}`}>
@@ -533,7 +802,7 @@ function ClimbRequest() {
                         <input
                           type="text"
                           name="numberOfPorters"
-                          value={formData.numberOfPorters && formData.numberOfPorters.trim() ? formData.numberOfPorters : 'Not specified'}
+                          value={formData.numberOfPorters ? (typeof formData.numberOfPorters === 'string' ? formData.numberOfPorters.trim() : String(formData.numberOfPorters)) : 'Not specified'}
                           readOnly
                           className="form-input form-input-readonly"
                         />
@@ -559,17 +828,43 @@ function ClimbRequest() {
                       <div className="section-line-green"></div>
                       <h4>Documents</h4>
                     </div>
-                    <div className="file-drop-zone">
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="document-icon">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
-                        <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2"/>
-                        <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" strokeWidth="2"/>
-                        <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" strokeWidth="2"/>
-                        <polyline points="10,9 9,9 8,9" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                      <p className="drop-zone-text">No files uploaded</p>
-                      <p className="drop-zone-hint">Click to browse</p>
-                    </div>
+                    {uploadedFiles && uploadedFiles.length > 0 ? (
+                      <div className="file-list">
+                        {uploadedFiles.map((file, index) => (
+                          <div key={index} className="file-item" onClick={() => handleFileOpen(file)}>
+                            <div className="file-icon">
+                              {getFileIcon(file.type || file.mimeType || '')}
+                            </div>
+                            <div className="file-info">
+                              <div className="file-name">{file.name || file.fileName || `Document ${index + 1}`}</div>
+                              {file.size && (
+                                <div className="file-size">
+                                  {(file.size / 1024).toFixed(2)} KB
+                                </div>
+                              )}
+                            </div>
+                            <div className="file-action">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke="currentColor" strokeWidth="2"/>
+                                <polyline points="15,3 21,3 21,9" stroke="currentColor" strokeWidth="2"/>
+                                <line x1="10" y1="14" x2="21" y2="3" stroke="currentColor" strokeWidth="2"/>
+                              </svg>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="file-drop-zone">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="document-icon">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
+                          <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2"/>
+                          <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" strokeWidth="2"/>
+                          <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" strokeWidth="2"/>
+                          <polyline points="10,9 9,9 8,9" stroke="currentColor" strokeWidth="2"/>
+                        </svg>
+                        <p className="drop-zone-text">No files uploaded</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Request Status Update Section */}
@@ -588,12 +883,19 @@ function ClimbRequest() {
                     <button
                       type="button"
                       className="send-update-btn"
-                      onClick={() => {
-                        if (adminNote.trim()) {
-                          // Handle sending update - you can add API call here
-                          console.log('Sending update:', adminNote);
-                          // Optionally show success message or clear the textarea
-                          // setAdminNote('');
+                      onClick={async () => {
+                        if (adminNote.trim() && selectedRequest) {
+                          try {
+                            // Update booking with admin notes
+                            const bookingStatus = selectedRequest._booking?.status || selectedRequest.status?.toLowerCase() || 'pending';
+                            await updateBookingStatus(selectedRequest.id, bookingStatus, adminNote);
+                            alert('Update sent successfully!');
+                            // Refresh requests
+                            await fetchClimbRequests();
+                          } catch (err) {
+                            console.error('Error sending update:', err);
+                            alert('Failed to send update. Please try again.');
+                          }
                         }
                       }}
                       disabled={!adminNote.trim()}
@@ -607,34 +909,64 @@ function ClimbRequest() {
                   </div>
                 </form>
               </div>
-              {selectedRequest.status === 'Pending' && (
+              {selectedRequest && (
                 <div className="modal-actions">
                   <div className="action-buttons">
-                    <button 
-                      className="btn-reject-new"
-                      onClick={() => {
-                        handleActionClick(selectedRequest.id, 'reject');
-                        setShowDetailsModal(false);
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                        <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                      Reject Request
-                    </button>
-                    <button 
-                      className="btn-approve-new"
-                      onClick={() => {
-                        handleActionClick(selectedRequest.id, 'approve');
-                        setShowDetailsModal(false);
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Approve Request
-                    </button>
+                    {(() => {
+                      // Check if status is pending - check multiple possible locations
+                      const bookingStatus = selectedRequest._booking?.status?.toLowerCase();
+                      const displayStatus = selectedRequest.status?.toLowerCase();
+                      const status = bookingStatus || displayStatus || '';
+                      const isPending = status === 'pending';
+                      
+                      return (
+                        <>
+                          <button 
+                            className="btn-reject-new"
+                            disabled={!isPending}
+                            onClick={async () => {
+                              if (!isPending) return;
+                              try {
+                                await handleActionClick(selectedRequest.id, 'reject');
+                                setShowDetailsModal(false);
+                                await fetchClimbRequests();
+                              } catch (err) {
+                                console.error('Error rejecting request:', err);
+                                alert('Failed to reject request. Please try again.');
+                              }
+                            }}
+                            style={{ opacity: isPending ? 1 : 0.5, cursor: isPending ? 'pointer' : 'not-allowed' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                              <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            </svg>
+                            Reject Request
+                          </button>
+                          <button 
+                            className="btn-approve-new"
+                            disabled={!isPending}
+                            onClick={async () => {
+                              if (!isPending) return;
+                              try {
+                                await handleActionClick(selectedRequest.id, 'approve');
+                                setShowDetailsModal(false);
+                                await fetchClimbRequests();
+                              } catch (err) {
+                                console.error('Error approving request:', err);
+                                alert('Failed to approve request. Please try again.');
+                              }
+                            }}
+                            style={{ opacity: isPending ? 1 : 0.5, cursor: isPending ? 'pointer' : 'not-allowed' }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                              <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            Approve Request
+                          </button>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

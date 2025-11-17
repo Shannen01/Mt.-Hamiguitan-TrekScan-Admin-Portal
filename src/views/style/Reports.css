@@ -59,8 +59,22 @@
 }
 
 .filter-btn.active {
-  background: #30622f;
-  color: #ffffff;
+  background: #30622f !important;
+  color: #ffffff !important;
+}
+
+.filter-btn.active:hover {
+  background: #30622f !important;
+  color: #ffffff !important;
+}
+
+.filter-btn:not(.active) {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.filter-btn:not(.active):hover {
+  background: #e5e7eb;
 }
 
 .custom-date-picker {

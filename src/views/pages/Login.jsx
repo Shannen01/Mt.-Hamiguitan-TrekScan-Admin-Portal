@@ -1,20 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useViewModel } from '../../hooks/useViewModel.js';
-import AuthViewModel from '../../viewmodels/AuthViewModel.js';
-import ApiClient from '../../models/ApiClient.js';
-import { config } from '../../config/config.js';
+import { signIn, getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
 import '../style/Login.css';
 import logoImage from '../../assets/Logo_admin_portal.png';
 import trekScanText from '../../assets/TrekScan_welomelogo.png';
 
 // Login page component
 function Login({ onLoginSuccess }) {
-  // Initialize ViewModel
-  const apiClient = new ApiClient(config.api.baseURL);
-  const authViewModel = new AuthViewModel(apiClient);
-  
-  // Connect ViewModel to React component
-  const { loading, error, isAuthenticated } = useViewModel(authViewModel);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   // Disable body scroll while Login is mounted
   useEffect(() => {
@@ -26,10 +20,35 @@ function Login({ onLoginSuccess }) {
 
   // Form state
   const [formData, setFormData] = useState({
-    username: '',
+    email: '', // Changed from username to email for Firebase Auth
     password: ''
   });
   const [formErrors, setFormErrors] = useState({});
+
+  // Check if user is already authenticated on mount
+  useEffect(() => {
+    const unsubscribe = onAuthStateChange((user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
+    });
+
+    // Check current user immediately
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      setIsAuthenticated(true);
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      }
+    }
+
+    return () => unsubscribe();
+  }, [onLoginSuccess]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -59,8 +78,10 @@ function Login({ onLoginSuccess }) {
   const validateForm = () => {
     const errors = {};
     
-    if (!formData.username) {
-      errors.username = 'Username is required';
+    if (!formData.email) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      errors.email = 'Email is invalid';
     }
     
     if (!formData.password) {
@@ -76,23 +97,40 @@ function Login({ onLoginSuccess }) {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
     
     if (!validateForm()) {
       return;
     }
 
-    // Temporary: Navigate to dashboard immediately after validation
-    if (onLoginSuccess) {
-      onLoginSuccess();
-      return;
+    setLoading(true);
+    try {
+      // Sign in with Firebase Auth
+      await signIn(formData.email, formData.password);
+      // Auth state change listener will handle the redirect
+    } catch (error) {
+      console.error('Login failed:', error);
+      
+      // Handle specific Firebase Auth errors
+      let errorMessage = 'Login failed. Please try again.';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-
-    // If you want real API auth later, uncomment:
-    // try {
-    //   await authViewModel.login(formData);
-    // } catch (error) {
-    //   console.error('Login failed:', error);
-    // }
   };
 
   return (
@@ -114,19 +152,19 @@ function Login({ onLoginSuccess }) {
           )}
 
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="email">Email</label>
             <input
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
               onChange={handleInputChange}
-              className={formErrors.username ? 'error' : ''}
-              placeholder="Enter your username"
+              className={formErrors.email ? 'error' : ''}
+              placeholder="Enter your email"
               disabled={loading}
             />
-            {formErrors.username && (
-              <span className="field-error">{formErrors.username}</span>
+            {formErrors.email && (
+              <span className="field-error">{formErrors.email}</span>
             )}
           </div>
 

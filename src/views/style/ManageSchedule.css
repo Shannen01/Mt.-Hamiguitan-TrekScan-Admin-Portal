@@ -230,8 +230,8 @@
   gap: 16px;
   margin-bottom: 24px;
   padding: 16px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: #30622f;
+  border: 1px solid #30622f;
   border-radius: 8px;
   flex-wrap: wrap;
 }
@@ -248,15 +248,16 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border: 1px solid #30622f;
+  border: 1px solid #F0FDF4;
   border-radius: 6px;
-  background: #ffffff;
+  background: #F0FDF4;
   transition: all 0.2s ease;
 }
 
 .schedule-search-container:focus-within {
-  border-color: #30622f;
-  box-shadow: 0 0 0 3px rgba(48, 98, 47, 0.1);
+  border-color: #F0FDF4;
+  box-shadow: 0 0 0 3px rgba(240, 253, 244, 0.3);
+  background: #F0FDF4;
 }
 
 .schedule-search-container .search-icon {
@@ -290,29 +291,29 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border: 1px solid #30622f;
+  border: 1px solid #F0FDF4;
   border-radius: 6px;
-  background: #ffffff;
+  background: #F0FDF4;
   cursor: pointer;
   transition: all 0.2s ease;
   outline: none;
 }
 
 .month-year-selector-btn:hover {
-  border-color: #30622f;
-  background: #f9fafb;
+  border-color: #F0FDF4;
+  background: #F0FDF4;
 }
 
 .month-year-selector-btn:focus {
   outline: none;
-  border-color: #30622f;
-  box-shadow: 0 0 0 3px rgba(48, 98, 47, 0.1);
+  border-color: #F0FDF4;
+  box-shadow: 0 0 0 3px rgba(240, 253, 244, 0.2);
 }
 
 .month-year-selector-btn:active {
   outline: none;
-  border-color: #30622f;
-  box-shadow: 0 0 0 3px rgba(48, 98, 47, 0.1);
+  border-color: #F0FDF4;
+  box-shadow: 0 0 0 3px rgba(240, 253, 244, 0.2);
 }
 
 .calendar-icon-filter {
@@ -473,10 +474,10 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  border: 1px solid #30622f;
+  border: 1px solid #F0FDF4;
   border-radius: 6px;
-  background: #ffffff;
-  color: #374151;
+  background: #F0FDF4;
+  color: #1f2937;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -486,24 +487,24 @@
 }
 
 .filter-dropdown-btn:hover {
-  background: #f9fafb;
-  border-color: #30622f;
+  background: #F0FDF4;
+  border-color: #F0FDF4;
 }
 
 .filter-dropdown-btn:focus {
   outline: none;
-  border-color: #30622f;
-  box-shadow: 0 0 0 3px rgba(48, 98, 47, 0.1);
+  border-color: #F0FDF4;
+  box-shadow: 0 0 0 3px rgba(240, 253, 244, 0.2);
 }
 
 .filter-dropdown-btn:active {
   outline: none;
-  border-color: #30622f;
-  box-shadow: 0 0 0 3px rgba(48, 98, 47, 0.1);
+  border-color: #F0FDF4;
+  box-shadow: 0 0 0 3px rgba(240, 253, 244, 0.2);
 }
 
 .filter-dropdown-btn .filter-icon {
-  color: #374151;
+  color: #6b7280;
   flex-shrink: 0;
 }
 

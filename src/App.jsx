@@ -1,33 +1,39 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useViewModel } from './hooks/useViewModel.js'
-import AuthViewModel from './viewmodels/AuthViewModel.js'
-import ApiClient from './models/ApiClient.js'
-import { config } from './config/config.js'
+import { useState, useEffect } from 'react'
+import { onAuthStateChange, getCurrentUser, signOutUser } from './services/firebaseAuthService'
 import Login from './views/pages/Login.jsx'
 import AppLayout from './layouts/AppLayout.jsx'
 import './App.css'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  
-  // Initialize ViewModel (memoized to avoid re-creation on each render)
-  const apiClient = useMemo(() => new ApiClient(config.api.baseURL), [])
-  const authViewModel = useMemo(() => new AuthViewModel(apiClient), [apiClient])
-  
-  // Connect ViewModel to React component
-  const { auth, loading, isAuthenticated: vmAuthenticated } = useViewModel(authViewModel)
+  const [loading, setLoading] = useState(true)
 
-  // Sync local flag with ViewModel-computed value
+  // Listen to Firebase Auth state changes
   useEffect(() => {
-    setIsAuthenticated(Boolean(vmAuthenticated))
-  }, [vmAuthenticated])
+    const unsubscribe = onAuthStateChange((user) => {
+      setIsAuthenticated(!!user)
+      setLoading(false)
+    })
+
+    // Check current user immediately
+    const currentUser = getCurrentUser()
+    setIsAuthenticated(!!currentUser)
+    setLoading(false)
+
+    return () => unsubscribe()
+  }, [])
 
   const handleLoginSuccess = () => {
     setIsAuthenticated(true)
   }
 
-  const handleLogout = () => {
-    setIsAuthenticated(false)
+  const handleLogout = async () => {
+    try {
+      await signOutUser()
+      setIsAuthenticated(false)
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
   }
 
   if (loading) {

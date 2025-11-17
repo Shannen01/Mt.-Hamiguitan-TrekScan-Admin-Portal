@@ -899,7 +899,12 @@ function ManageSchedule() {
                 const eventMonth = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
                 const filteredEvents = events
                   .filter(e => {
-                    return (e.status === 'Upcoming' || e.status === 'Active') && e.month === eventMonth;
+                    const matchesMonth = e.month === eventMonth;
+                    const matchesStatus = (e.status === 'Upcoming' || e.status === 'Active');
+                    const searchTerm = searchQuery.trim().toLowerCase();
+                    const eventTitle = e.title.trim().toLowerCase();
+                    const matchesSearch = searchTerm === '' || eventTitle.includes(searchTerm);
+                    return matchesMonth && matchesStatus && matchesSearch;
                   })
                   .sort((a, b) => a.day - b.day);
                 

@@ -1,5 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, Box, Typography, LinearProgress } from '@mui/material';
+import { Hiking } from '@mui/icons-material';
+import { getAllBookings, formatBookingDate } from '../../services/bookingService';
+import { getUserById } from '../../services/userService';
+import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
+import { Timestamp } from 'firebase/firestore';
+import '../style/Reports.css';
 
 function Dashboard({ onNavigate }) {
   // Generate dates from Oct 1 to Oct 30 with realistic trekking groups
@@ -90,25 +96,217 @@ function Dashboard({ onNavigate }) {
   const [activeTab, setActiveTab] = React.useState('upcoming'); // 'upcoming' or 'recent'
   const [trekkerSearch, setTrekkerSearch] = React.useState('');
   const [showAllTrekkersModal, setShowAllTrekkersModal] = React.useState(false);
+  const [upcomingClimbs, setUpcomingClimbs] = useState([]);
+  const [recentApprovals, setRecentApprovals] = useState([]);
+  const [todaysTrekkers, setTodaysTrekkers] = useState([]);
+  const [stats, setStats] = useState({
+    activeClimbs: 0,
+    approvedCount: 0,
+    pendingCount: 0,
+    monthlyBookings: 0
+  });
+  const [loading, setLoading] = useState(true);
 
-  // Data for upcoming climbs
-  const upcomingClimbs = [
-    { date: 'May 25 2025', name: 'Juan Dela Cruz', status: 'confirmed' },
-    { date: 'May 26 2025', name: 'Juan Tom-od', status: 'confirmed' },
-    { date: 'May 27 2025', name: 'Maria Santos', status: 'confirmed' },
-    { date: 'May 28 2025', name: 'Pedro Rodriguez', status: 'cancelled' },
-    { date: 'May 29 2025', name: 'Ana Garcia', status: 'confirmed' },
-    { date: 'May 30 2025', name: 'Carlos Mendoza', status: 'pending' },
-    { date: 'May 31 2025', name: 'Isabella Reyes', status: 'confirmed' },
-  ];
+  // Fetch upcoming climbs and recent approvals
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        setLoading(false);
+        return;
+      }
 
-  // Data for recent approvals
-  const recentApprovals = [
-    { date: 'May 23 2025', name: 'Maria Santos', status: 'approved' },
-    { date: 'May 22 2025', name: 'Pedro Rodriguez', status: 'approved' },
-    { date: 'May 21 2025', name: 'Ana Garcia', status: 'approved' },
-    { date: 'May 20 2025', name: 'Carlos Lopez', status: 'approved' },
-  ];
+      // Get all bookings
+      const allBookings = await getAllBookings();
+      
+      // Get today's date at midnight for comparison
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayTimestamp = Timestamp.fromDate(today);
+      
+      // Get date 7 days from now
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+      sevenDaysFromNow.setHours(23, 59, 59, 999);
+      const sevenDaysTimestamp = Timestamp.fromDate(sevenDaysFromNow);
+
+      // Filter approved bookings with upcoming dates (next 7 days)
+      const upcomingBookings = allBookings
+        .filter(booking => {
+          const status = booking.status?.toLowerCase();
+          const trekDate = booking.trekDate;
+          if (!trekDate) return false;
+          
+          const trekDateTimestamp = trekDate instanceof Timestamp 
+            ? trekDate 
+            : Timestamp.fromDate(new Date(trekDate));
+          
+          return status === 'approved' && 
+                 trekDateTimestamp >= todayTimestamp && 
+                 trekDateTimestamp <= sevenDaysTimestamp;
+        })
+        .sort((a, b) => {
+          const dateA = a.trekDate instanceof Timestamp 
+            ? a.trekDate.toMillis() 
+            : new Date(a.trekDate).getTime();
+          const dateB = b.trekDate instanceof Timestamp 
+            ? b.trekDate.toMillis() 
+            : new Date(b.trekDate).getTime();
+          return dateA - dateB;
+        })
+        .slice(0, 7); // Limit to 7 upcoming climbs
+
+      // Fetch user data for upcoming climbs
+      const upcomingWithUsers = await Promise.all(
+        upcomingBookings.map(async (booking) => {
+          const user = booking.userId ? await getUserById(booking.userId) : null;
+          return {
+            date: formatBookingDate(booking.trekDate, 'short'),
+            name: user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User',
+            status: booking.status?.toLowerCase() || 'pending',
+            bookingId: booking.id
+          };
+        })
+      );
+      setUpcomingClimbs(upcomingWithUsers);
+
+      // Get recent approvals (approved in the last 7 days, sorted by approval date)
+      const recentApprovedBookings = allBookings
+        .filter(booking => {
+          const status = booking.status?.toLowerCase();
+          return status === 'approved';
+        })
+        .sort((a, b) => {
+          const dateA = a.updatedAt instanceof Timestamp 
+            ? a.updatedAt.toMillis() 
+            : (a.createdAt instanceof Timestamp ? a.createdAt.toMillis() : 0);
+          const dateB = b.updatedAt instanceof Timestamp 
+            ? b.updatedAt.toMillis() 
+            : (b.createdAt instanceof Timestamp ? b.createdAt.toMillis() : 0);
+          return dateB - dateA; // Most recent first
+        })
+        .slice(0, 4); // Limit to 4 recent approvals
+
+      // Fetch user data for recent approvals
+      const recentWithUsers = await Promise.all(
+        recentApprovedBookings.map(async (booking) => {
+          const user = booking.userId ? await getUserById(booking.userId) : null;
+          return {
+            date: formatBookingDate(booking.updatedAt || booking.createdAt, 'short'),
+            name: user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User',
+            status: 'approved',
+            bookingId: booking.id
+          };
+        })
+      );
+      setRecentApprovals(recentWithUsers);
+
+      // Get today's trekkers (approved bookings with trekDate = today)
+      const todayBookings = allBookings.filter(booking => {
+        const status = booking.status?.toLowerCase();
+        const trekDate = booking.trekDate;
+        if (!trekDate || status !== 'approved') return false;
+        
+        const trekDateTimestamp = trekDate instanceof Timestamp 
+          ? trekDate 
+          : Timestamp.fromDate(new Date(trekDate));
+        
+        const trekDateOnly = new Date(trekDateTimestamp.toDate());
+        trekDateOnly.setHours(0, 0, 0, 0);
+        
+        return trekDateOnly.getTime() === today.getTime();
+      });
+
+      // Fetch user data for today's trekkers
+      const todaysWithUsers = await Promise.all(
+        todayBookings.map(async (booking, index) => {
+          const user = booking.userId ? await getUserById(booking.userId) : null;
+          return {
+            id: booking.id,
+            name: user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User',
+            time: '6:00 AM', // Default time, could be enhanced with actual time if stored
+            status: 'confirmed',
+            number: index + 1
+          };
+        })
+      );
+      setTodaysTrekkers(todaysWithUsers);
+
+      // Calculate stats
+      const approvedCount = allBookings.filter(b => b.status?.toLowerCase() === 'approved').length;
+      const pendingCount = allBookings.filter(b => b.status?.toLowerCase() === 'pending').length;
+      const activeClimbs = allBookings.filter(b => {
+        const status = b.status?.toLowerCase();
+        const trekDate = b.trekDate;
+        if (!trekDate) return false;
+        
+        const trekDateTimestamp = trekDate instanceof Timestamp 
+          ? trekDate 
+          : Timestamp.fromDate(new Date(trekDate));
+        const trekDateOnly = new Date(trekDateTimestamp.toDate());
+        trekDateOnly.setHours(0, 0, 0, 0);
+        
+        return (status === 'approved' || status === 'pending') && 
+               trekDateOnly >= today;
+      }).length;
+
+      // Monthly bookings (current month)
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const monthlyBookings = allBookings.filter(b => {
+        const createdAt = b.createdAt instanceof Timestamp 
+          ? b.createdAt.toDate() 
+          : new Date(b.createdAt);
+        return createdAt.getMonth() === currentMonth && 
+               createdAt.getFullYear() === currentYear;
+      }).length;
+
+      setStats({
+        activeClimbs,
+        approvedCount,
+        pendingCount,
+        monthlyBookings
+      });
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setLoading(false);
+    }
+  };
+
+  // Fetch data on mount and when auth state changes
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChange((user) => {
+      if (user) {
+        fetchDashboardData();
+      } else {
+        setUpcomingClimbs([]);
+        setRecentApprovals([]);
+        setTodaysTrekkers([]);
+        setStats({
+          activeClimbs: 0,
+          approvedCount: 0,
+          pendingCount: 0,
+          monthlyBookings: 0
+        });
+        setLoading(false);
+      }
+    });
+
+    if (currentUser) {
+      fetchDashboardData();
+    }
+
+    return () => unsubscribe();
+  }, []);
 
   const StatsCard = ({ title, value, subtitle, progress }) => (
     <Card elevation={2} sx={{ borderRadius: 2 }}>
@@ -147,89 +345,60 @@ function Dashboard({ onNavigate }) {
   return (
     <div style={{ paddingTop: '24px', paddingLeft: '32px', paddingRight: '32px', paddingBottom: '300px' }}>
         {/* Stats Cards Section */}
-        <div className="dashboard-stats-cards">
-          <div className="stat-card">
-            <div className="stat-card-icon-square">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 20L12 4L21 20H3Z" fill="currentColor"/>
+        <div className="dashboard-stats-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+          {/* Monthly Bookings Card */}
+          <div className="metric-card">
+            <div className="metric-card-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M9 11C11.2091 11 13 9.20914 13 7C13 4.79086 11.2091 3 9 3C6.79086 3 5 4.79086 5 7C5 9.20914 6.79086 11 9 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <div className="stat-card-growth-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 5V19M5 12L12 5L19 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              +12%
+            <div className="metric-card-content">
+              <div className="metric-card-value">{loading ? '...' : stats.monthlyBookings.toLocaleString()}</div>
+              <div className="metric-card-label">Monthly Bookings</div>
             </div>
-            <div className="stat-card-content">
-              <div className="stat-card-value">24</div>
-              <div className="stat-card-label">Active Climbs</div>
-            </div>
-            <div className="stat-card-accent-line"></div>
           </div>
           
-          <div className="stat-card">
-            <div className="stat-card-icon-square">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          {/* Approved Card */}
+          <div className="metric-card">
+            <div className="metric-card-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M9 11L12 14L22 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M21 12V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <div className="stat-card-growth-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 5V19M5 12L12 5L19 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              +72%
+            <div className="metric-card-content">
+              <div className="metric-card-value">{loading ? '...' : stats.approvedCount.toLocaleString()}</div>
+              <div className="metric-card-label">Approved</div>
             </div>
-            <div className="stat-card-content">
-              <div className="stat-card-value">18/7</div>
-              <div className="stat-card-label">Approved vs. Pending</div>
-            </div>
-            <div className="stat-card-accent-line"></div>
           </div>
           
-          <div className="stat-card">
-            <div className="stat-card-icon-square">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-                <path d="M16 2V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                <path d="M8 2V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                <path d="M3 10H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          {/* Pending Card */}
+          <div className="metric-card">
+            <div className="metric-card-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <path d="M15 9L9 15M9 9L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             </div>
-            <div className="stat-card-growth-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 5V19M5 12L12 5L19 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              +15.3%
+            <div className="metric-card-content">
+              <div className="metric-card-value">{loading ? '...' : stats.pendingCount.toLocaleString()}</div>
+              <div className="metric-card-label">Pending</div>
             </div>
-            <div className="stat-card-content">
-              <div className="stat-card-value">1,247</div>
-              <div className="stat-card-label">Monthly Bookings</div>
-            </div>
-            <div className="stat-card-accent-line"></div>
           </div>
           
-          <div className="stat-card">
-            <div className="stat-card-icon-square">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-                <path d="M3 9H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                <path d="M9 3V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                <rect x="6" y="12" width="3" height="6" fill="currentColor"/>
-                <rect x="11" y="9" width="3" height="9" fill="currentColor"/>
-                <rect x="16" y="6" width="3" height="12" fill="currentColor"/>
-              </svg>
+          {/* Active Climbs Card */}
+          <div className="metric-card">
+            <div className="metric-card-icon">
+              <Hiking sx={{ fontSize: 24 }} />
             </div>
-            <div className="stat-card-growth-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 5V19M5 12L12 5L19 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              +8.5%
+            <div className="metric-card-content">
+              <div className="metric-card-value">{loading ? '...' : stats.activeClimbs.toLocaleString()}</div>
+              <div className="metric-card-label">Active Climbs</div>
             </div>
-            <div className="stat-card-content">
-              <div className="stat-card-value">30</div>
-              <div className="stat-card-label">Peak Capacity</div>
-            </div>
-            <div className="stat-card-accent-line"></div>
           </div>
         </div>
         
@@ -440,37 +609,44 @@ function Dashboard({ onNavigate }) {
               </div>
               
               <div className="trekkers-list">
-                {[
-                  { id: 'juan-dela-cruz', name: 'Juan Dela Cruz', time: '6:00 AM', status: 'confirmed', number: 1 },
-                  { id: 'juan-tom-od', name: 'Juan Tom-od', time: '6:00 AM', status: 'confirmed', number: 2 },
-                  { id: 'wa-ethil', name: 'Wa Ethil', time: '7:00 AM', status: 'pending', number: 3 },
-                  { id: 'maria-santos', name: 'Maria Santos', time: '6:00 AM', status: 'confirmed', number: 4 },
-                  { id: 'pedro-rodriguez', name: 'Pedro Rodriguez', time: '8:00 AM', status: 'confirmed', number: 5 }
-                ]
-                  .filter(trekker => 
-                    !trekkerSearch || 
-                    trekker.name.toLowerCase().includes(trekkerSearch.toLowerCase())
-                  )
-                  .map((trekker) => (
-                  <div key={trekker.id} className="trekker-item">
-                    <div className="trekker-badge">{trekker.number}</div>
-                    <div className="trekker-info">
-                      <div className="trekker-name">{trekker.name}</div>
-                    </div>
+                {loading ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                    Loading trekkers...
                   </div>
-                ))}
+                ) : todaysTrekkers.length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                    No trekkers scheduled for today
+                  </div>
+                ) : (
+                  todaysTrekkers
+                    .filter(trekker => 
+                      !trekkerSearch || 
+                      trekker.name.toLowerCase().includes(trekkerSearch.toLowerCase())
+                    )
+                    .slice(0, 5)
+                    .map((trekker) => (
+                    <div key={trekker.id} className="trekker-item">
+                      <div className="trekker-badge">{trekker.number}</div>
+                      <div className="trekker-info">
+                        <div className="trekker-name">{trekker.name}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
               
-              <button className="view-all-trekkers-btn" onClick={() => setShowAllTrekkersModal(true)}>
-                View All 5 More Trekkers
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M6 9L12 15L18 9" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
+              {!loading && todaysTrekkers.length > 5 && (
+                <button className="view-all-trekkers-btn" onClick={() => setShowAllTrekkersModal(true)}>
+                  View All {todaysTrekkers.length - 5} More Trekkers
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 9L12 15L18 9" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              )}
               
               <div className="trekkers-footer">
                 <span className="trekkers-footer-label">Total Trekkers Today:</span>
-                <span className="trekkers-footer-count">10</span>
+                <span className="trekkers-footer-count">{loading ? '...' : todaysTrekkers.length}</span>
               </div>
             </CardContent>
           </Card>
@@ -528,29 +704,46 @@ function Dashboard({ onNavigate }) {
                 <div className="table-cell">Name</div>
                 <div className="table-cell">Status</div>
               </div>
-              {activeTab === 'upcoming' ? (
-                upcomingClimbs.map((climb, index) => (
-                  <div key={index} className="table-row">
-                    <div className="table-cell">{climb.date}</div>
-                    <div className="table-cell">{climb.name}</div>
-                    <div className="table-cell">
-                      <span className={`status-badge ${climb.status}`}>
-                        {climb.status === 'confirmed' ? 'Confirmed' : 
-                         climb.status === 'cancelled' ? 'Cancelled' : 'Pending'}
-                      </span>
-                    </div>
+              {loading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+                  Loading climbs...
+                </div>
+              ) : activeTab === 'upcoming' ? (
+                upcomingClimbs.length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+                    No upcoming climbs in the next 7 days
                   </div>
-                ))
+                ) : (
+                  upcomingClimbs.map((climb, index) => (
+                    <div key={climb.bookingId || index} className="table-row">
+                      <div className="table-cell">{climb.date}</div>
+                      <div className="table-cell">{climb.name}</div>
+                      <div className="table-cell">
+                        <span className={`status-badge ${climb.status === 'approved' ? 'confirmed' : climb.status}`}>
+                          {climb.status === 'approved' ? 'Confirmed' : 
+                           climb.status === 'confirmed' ? 'Confirmed' : 
+                           climb.status === 'cancelled' ? 'Cancelled' : 'Pending'}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )
               ) : (
-                recentApprovals.map((approval, index) => (
-                  <div key={index} className="table-row">
-                    <div className="table-cell">{approval.date}</div>
-                    <div className="table-cell">{approval.name}</div>
-                    <div className="table-cell">
-                      <span className="status-badge approved">Approved</span>
-                    </div>
+                recentApprovals.length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+                    No recent approvals
                   </div>
-                ))
+                ) : (
+                  recentApprovals.map((approval, index) => (
+                    <div key={approval.bookingId || index} className="table-row">
+                      <div className="table-cell">{approval.date}</div>
+                      <div className="table-cell">{approval.name}</div>
+                      <div className="table-cell">
+                        <span className="status-badge approved">Approved</span>
+                      </div>
+                    </div>
+                  ))
+                )
               )}
             </div>
           </CardContent>
@@ -588,36 +781,35 @@ function Dashboard({ onNavigate }) {
                 </div>
 
                 <div className="trekkers-modal-list">
-                  {[
-                    { id: 'juan-dela-cruz', name: 'Juan Dela Cruz', time: '6:00 AM', status: 'confirmed', number: 1 },
-                    { id: 'juan-tom-od', name: 'Juan Tom-od', time: '6:00 AM', status: 'confirmed', number: 2 },
-                    { id: 'wa-ethil', name: 'Wa Ethil', time: '7:00 AM', status: 'pending', number: 3 },
-                    { id: 'maria-santos', name: 'Maria Santos', time: '6:00 AM', status: 'confirmed', number: 4 },
-                    { id: 'pedro-rodriguez', name: 'Pedro Rodriguez', time: '8:00 AM', status: 'confirmed', number: 5 },
-                    { id: 'ana-garcia', name: 'Ana Garcia', time: '9:00 AM', status: 'confirmed', number: 6 },
-                    { id: 'carlos-lopez', name: 'Carlos Lopez', time: '7:30 AM', status: 'pending', number: 7 },
-                    { id: 'lisa-martinez', name: 'Lisa Martinez', time: '8:30 AM', status: 'confirmed', number: 8 },
-                    { id: 'james-wilson', name: 'James Wilson', time: '9:30 AM', status: 'confirmed', number: 9 },
-                    { id: 'sarah-brown', name: 'Sarah Brown', time: '10:00 AM', status: 'confirmed', number: 10 }
-                  ]
-                    .filter(trekker => 
-                      !trekkerSearch || 
-                      trekker.name.toLowerCase().includes(trekkerSearch.toLowerCase())
-                    )
-                    .map((trekker) => (
-                      <div key={trekker.id} className="trekker-modal-item">
-                        <div className="trekker-badge">{trekker.number}</div>
-                        <div className="trekker-info">
-                          <div className="trekker-name">{trekker.name}</div>
+                  {loading ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                      Loading trekkers...
+                    </div>
+                  ) : todaysTrekkers.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                      No trekkers scheduled for today
+                    </div>
+                  ) : (
+                    todaysTrekkers
+                      .filter(trekker => 
+                        !trekkerSearch || 
+                        trekker.name.toLowerCase().includes(trekkerSearch.toLowerCase())
+                      )
+                      .map((trekker) => (
+                        <div key={trekker.id} className="trekker-modal-item">
+                          <div className="trekker-badge">{trekker.number}</div>
+                          <div className="trekker-info">
+                            <div className="trekker-name">{trekker.name}</div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                  )}
                 </div>
               </div>
               
               <div className="trekkers-modal-footer">
                 <span className="trekkers-footer-label">Total Trekkers Today:</span>
-                <span className="trekkers-footer-count">10</span>
+                <span className="trekkers-footer-count">{loading ? '...' : todaysTrekkers.length}</span>
               </div>
             </div>
           </div>
