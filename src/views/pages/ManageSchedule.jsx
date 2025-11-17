@@ -3,8 +3,8 @@ import '../style/ManageSchedule.css';
 
 function ManageSchedule() {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
-  const [currentDate, setCurrentDate] = useState(new Date(2019, 6, 1)); // July 2019
-  const [selectedDay, setSelectedDay] = useState(13);
+  const [currentDate, setCurrentDate] = useState(new Date(2022, 10, 1)); // November 2022
+  const [selectedDay, setSelectedDay] = useState(10);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -18,73 +18,269 @@ function ManageSchedule() {
   const events = [
     {
       id: 1,
-      day: 8,
-      month: 'JUL',
-      title: 'Mt. Hamiguitan Summit Trek',
-      description: 'Trek event for participants',
+      day: 31,
+      month: 'OCT',
+      title: 'Design system update',
+      description: 'Design system update event',
       location: 'Mt. Hamiguitan',
       participants: 25,
       status: 'Active',
-      type: 'Trek',
-      color: '#30622f',
-      time: '12:30 PM',
+      type: 'Design',
+      color: '#E9D5FF',
+      time: '10:30 - 12:00',
       price: 'Free'
     },
     {
       id: 2,
-      day: 17,
-      month: 'JUL',
-      title: 'Beginners Hiking Workshop',
-      description: 'Workshop event for participants',
+      day: 2,
+      month: 'NOV',
+      title: 'Wireframe for ios app',
+      description: 'Wireframe event',
       location: 'Mt. Hamiguitan Base Camp',
       participants: 15,
       status: 'Upcoming',
-      type: 'Workshop',
-      color: '#30622f',
-      time: '6:30 PM',
+      type: 'Design',
+      color: '#A7F3D0',
+      time: '10:30 - 12:00',
       price: '₱500'
     },
     {
       id: 3,
-      day: 22,
-      month: 'JUL',
-      title: 'Trail Cleanup Drive',
-      description: 'Community event for participants',
+      day: 3,
+      month: 'NOV',
+      title: 'Brand guideline product',
+      description: 'Brand guideline event',
       location: 'Mt. Hamiguitan Trails',
       participants: 40,
       status: 'Upcoming',
-      type: 'Community',
-      color: '#30622f',
-      time: '6:00 PM',
+      type: 'Brand',
+      color: '#DDD6FE',
+      time: '10:30 - 12:00',
       price: 'Free'
     },
     {
       id: 4,
-      day: 25,
-      month: 'JUL',
-      title: 'Night Camping Experience',
-      description: 'Camping event for participants',
+      day: 4,
+      month: 'NOV',
+      title: 'Brand guideline product',
+      description: 'Brand guideline event',
       location: 'Mt. Hamiguitan Camp Site',
       participants: 18,
       status: 'Upcoming',
-      type: 'Camping',
-      color: '#30622f',
-      time: '5:30 PM',
+      type: 'Brand',
+      color: '#DDD6FE',
+      time: '10:30 - 12:00',
       price: '₱1,200'
     },
     {
       id: 5,
-      day: 1,
-      month: 'AUG',
-      title: 'Wildlife Photography Tour',
-      description: 'Training event for participants',
+      day: 6,
+      month: 'NOV',
+      title: 'Website product ui design kit',
+      description: 'Website design event',
       location: 'Mt. Hamiguitan Range',
       participants: 12,
       status: 'Upcoming',
-      type: 'Training',
-      color: '#30622f',
-      time: '9:00 AM',
+      type: 'Website',
+      color: '#FED7AA',
+      time: '10:30 - 12:00',
       price: '₱800'
+    },
+    {
+      id: 6,
+      day: 8,
+      month: 'NOV',
+      title: 'Quicky product promotion',
+      description: 'Product promotion event',
+      location: 'Mt. Hamiguitan',
+      participants: 20,
+      status: 'Upcoming',
+      type: 'Promotion',
+      color: '#BFDBFE',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 7,
+      day: 10,
+      month: 'NOV',
+      title: 'Website product ui design kit',
+      description: 'Website design event',
+      location: 'Mt. Hamiguitan',
+      participants: 15,
+      status: 'Active',
+      type: 'Website',
+      color: '#FED7AA',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 8,
+      day: 12,
+      month: 'NOV',
+      title: 'Quicky product promotion',
+      description: 'Product promotion event',
+      location: 'Mt. Hamiguitan',
+      participants: 18,
+      status: 'Upcoming',
+      type: 'Promotion',
+      color: '#BFDBFE',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 9,
+      day: 14,
+      month: 'NOV',
+      title: 'Website product ui design kit',
+      description: 'Website design event',
+      location: 'Mt. Hamiguitan',
+      participants: 22,
+      status: 'Upcoming',
+      type: 'Website',
+      color: '#FED7AA',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 10,
+      day: 16,
+      month: 'NOV',
+      title: 'Brand guideline product',
+      description: 'Brand guideline event',
+      location: 'Mt. Hamiguitan',
+      participants: 25,
+      status: 'Upcoming',
+      type: 'Brand',
+      color: '#DDD6FE',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 11,
+      day: 18,
+      month: 'NOV',
+      title: 'Website product ui design kit',
+      description: 'Website design event',
+      location: 'Mt. Hamiguitan',
+      participants: 20,
+      status: 'Upcoming',
+      type: 'Website',
+      color: '#FED7AA',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 12,
+      day: 20,
+      month: 'NOV',
+      title: 'Wireframe for ios app',
+      description: 'Wireframe event',
+      location: 'Mt. Hamiguitan',
+      participants: 15,
+      status: 'Upcoming',
+      type: 'Design',
+      color: '#A7F3D0',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 13,
+      day: 22,
+      month: 'NOV',
+      title: 'Quicky product promotion',
+      description: 'Product promotion event',
+      location: 'Mt. Hamiguitan',
+      participants: 18,
+      status: 'Upcoming',
+      type: 'Promotion',
+      color: '#BFDBFE',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 14,
+      day: 24,
+      month: 'NOV',
+      title: 'Real estate website project',
+      description: 'Real estate project event',
+      location: 'Mt. Hamiguitan',
+      participants: 30,
+      status: 'Upcoming',
+      type: 'Project',
+      color: '#86EFAC',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 15,
+      day: 26,
+      month: 'NOV',
+      title: 'Quicky product promotion',
+      description: 'Product promotion event',
+      location: 'Mt. Hamiguitan',
+      participants: 20,
+      status: 'Upcoming',
+      type: 'Promotion',
+      color: '#BFDBFE',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 16,
+      day: 28,
+      month: 'NOV',
+      title: 'Brand guideline product',
+      description: 'Brand guideline event',
+      location: 'Mt. Hamiguitan',
+      participants: 25,
+      status: 'Upcoming',
+      type: 'Brand',
+      color: '#DDD6FE',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 17,
+      day: 30,
+      month: 'NOV',
+      title: 'Wireframe for ios app',
+      description: 'Wireframe event',
+      location: 'Mt. Hamiguitan',
+      participants: 15,
+      status: 'Upcoming',
+      type: 'Design',
+      color: '#A7F3D0',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 18,
+      day: 2,
+      month: 'DEC',
+      title: 'Brand guideline product',
+      description: 'Brand guideline event',
+      location: 'Mt. Hamiguitan',
+      participants: 22,
+      status: 'Upcoming',
+      type: 'Brand',
+      color: '#DDD6FE',
+      time: '10:30 - 12:00',
+      price: 'Free'
+    },
+    {
+      id: 19,
+      day: 4,
+      month: 'DEC',
+      title: 'Real estate website project',
+      description: 'Real estate project event',
+      location: 'Mt. Hamiguitan',
+      participants: 28,
+      status: 'Upcoming',
+      type: 'Project',
+      color: '#86EFAC',
+      time: '10:30 - 12:00',
+      price: 'Free'
     }
   ];
 
@@ -142,6 +338,21 @@ function ManageSchedule() {
 
   const formatMonthYear = (date) => {
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const formatCurrentDay = (date, day) => {
+    const dayDate = new Date(date.getFullYear(), date.getMonth(), day);
+    const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const dayNumber = day;
+    const suffix = dayNumber === 1 || dayNumber === 21 || dayNumber === 31 ? 'st' :
+                   dayNumber === 2 || dayNumber === 22 ? 'nd' :
+                   dayNumber === 3 || dayNumber === 23 ? 'rd' : 'th';
+    return `${dayName} ${dayNumber}${suffix}`;
+  };
+
+  const getDayOfWeek = (date, day) => {
+    const dayDate = new Date(date.getFullYear(), date.getMonth(), day);
+    return dayDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
   };
 
   const handleMonthChange = (e) => {
@@ -300,20 +511,6 @@ function ManageSchedule() {
                 </div>
               </div>
             </div>
-            
-            {/* Past Events Section */}
-            <div className="past-events-section">
-              <h3 className="past-events-title">Past Event</h3>
-              <div className="past-events-list">
-                {pastEvents.map(event => (
-                  <div key={event.id} className="past-event-item">
-                    <h4 className="past-event-title">{event.title}</h4>
-                    <p className="past-event-description">{event.description}</p>
-                    <span className="past-event-date">{event.date}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Right Column - Upcoming Events */}
@@ -362,7 +559,99 @@ function ManageSchedule() {
           </div>
         </div>
       ) : (
-        <div></div>
+        <div className="calendar-view-container">
+          {/* Calendar Header */}
+          <div className="calendar-view-header">
+            <div className="calendar-current-day">
+              <h2>{formatCurrentDay(currentDate, selectedDay)}</h2>
+            </div>
+            <div className="calendar-month-navigation">
+              <button className="calendar-nav-arrow" onClick={() => navigateMonth('prev')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <span className="calendar-month-year-display">
+                {formatMonthYear(currentDate)}
+              </span>
+              <button className="calendar-nav-arrow" onClick={() => navigateMonth('next')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="calendar-view-grid">
+            <div className="calendar-weekdays-header">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
+                const currentDayOfWeek = getDayOfWeek(currentDate, selectedDay);
+                const dayIndex = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Convert Sunday=0 to Monday=0
+                const isCurrentDay = index === dayIndex;
+                return (
+                  <div key={day} className={`calendar-weekday-header ${isCurrentDay ? 'highlighted' : ''}`}>
+                    {day}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="calendar-days-grid">
+              {(() => {
+                const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
+                const days = [];
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                
+                // Get previous month's last day
+                const prevMonth = new Date(year, month, 0);
+                const prevMonthDays = prevMonth.getDate();
+                
+                // Adjust starting day (Monday = 0, Sunday = 6)
+                const adjustedStart = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
+                
+                // Days from previous month
+                for (let i = adjustedStart - 1; i >= 0; i--) {
+                  const day = prevMonthDays - i;
+                  days.push(
+                    <div key={`prev-${day}`} className="calendar-day-cell other-month">
+                      <div className="calendar-day-number">{day}</div>
+                    </div>
+                  );
+                }
+                
+                // Days of the current month
+                for (let day = 1; day <= daysInMonth; day++) {
+                  const isSelected = day === selectedDay;
+                  
+                  days.push(
+                    <div 
+                      key={day} 
+                      className={`calendar-day-cell ${isSelected ? 'selected' : ''}`}
+                      onClick={() => setSelectedDay(day)}
+                    >
+                      <div className="calendar-day-number">{day}</div>
+                    </div>
+                  );
+                }
+                
+                // Fill remaining cells with next month's days
+                const totalCells = days.length;
+                const cellsInGrid = Math.ceil(totalCells / 7) * 7;
+                const remainingCells = cellsInGrid - totalCells;
+                for (let i = 1; i <= remainingCells; i++) {
+                  days.push(
+                    <div key={`next-${i}`} className="calendar-day-cell other-month">
+                      <div className="calendar-day-number">{i}</div>
+                    </div>
+                  );
+                }
+                
+                return days;
+              })()}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Create Event Modal */}
