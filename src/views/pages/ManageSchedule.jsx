@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import '../style/EventManagement.css';
+import '../style/ManageSchedule.css';
 
-function EventManagement() {
+function ManageSchedule() {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 5, 1)); // June 2025
+  const [currentDate, setCurrentDate] = useState(new Date(2019, 6, 1)); // July 2019
+  const [selectedDay, setSelectedDay] = useState(13);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -17,63 +18,94 @@ function EventManagement() {
   const events = [
     {
       id: 1,
-      day: 15,
-      month: 'JUN',
+      day: 8,
+      month: 'JUL',
       title: 'Mt. Hamiguitan Summit Trek',
       description: 'Trek event for participants',
       location: 'Mt. Hamiguitan',
       participants: 25,
       status: 'Active',
       type: 'Trek',
-      color: '#93c5fd' // light blue (matches calendar display)
+      color: '#30622f',
+      time: '12:30 PM',
+      price: 'Free'
     },
     {
       id: 2,
-      day: 22,
-      month: 'JUN',
+      day: 17,
+      month: 'JUL',
       title: 'Beginners Hiking Workshop',
       description: 'Workshop event for participants',
       location: 'Mt. Hamiguitan Base Camp',
       participants: 15,
       status: 'Upcoming',
       type: 'Workshop',
-      color: '#c084fc' // light purple (matches calendar display)
+      color: '#30622f',
+      time: '6:30 PM',
+      price: '₱500'
     },
     {
       id: 3,
-      day: 8,
-      month: 'JUN',
+      day: 22,
+      month: 'JUL',
       title: 'Trail Cleanup Drive',
       description: 'Community event for participants',
       location: 'Mt. Hamiguitan Trails',
       participants: 40,
-      status: 'Completed',
+      status: 'Upcoming',
       type: 'Community',
-      color: '#86efac' // light green (matches calendar display)
+      color: '#30622f',
+      time: '6:00 PM',
+      price: 'Free'
     },
     {
       id: 4,
-      day: 29,
-      month: 'JUN',
+      day: 25,
+      month: 'JUL',
       title: 'Night Camping Experience',
       description: 'Camping event for participants',
       location: 'Mt. Hamiguitan Camp Site',
       participants: 18,
       status: 'Upcoming',
       type: 'Camping',
-      color: '#10b981' // dark green (matches calendar display)
+      color: '#30622f',
+      time: '5:30 PM',
+      price: '₱1,200'
     },
     {
       id: 5,
-      day: 5,
-      month: 'JUN',
+      day: 1,
+      month: 'AUG',
       title: 'Wildlife Photography Tour',
       description: 'Training event for participants',
       location: 'Mt. Hamiguitan Range',
       participants: 12,
-      status: 'Active',
+      status: 'Upcoming',
       type: 'Training',
-      color: '#fdba74' // light orange
+      color: '#30622f',
+      time: '9:00 AM',
+      price: '₱800'
+    }
+  ];
+
+  const pastEvents = [
+    {
+      id: 6,
+      day: 2,
+      month: 'AUG',
+      year: 2024,
+      title: 'Introduction to Blockchain Workshop',
+      description: 'Learn the basics of blockchain technology',
+      date: '02 Aug 2024'
+    },
+    {
+      id: 7,
+      day: 15,
+      month: 'AUG',
+      year: 2024,
+      title: 'Introduction to Digital Marketing Workshop',
+      description: 'Master digital marketing strategies',
+      date: '15 Aug 2024'
     }
   ];
 
@@ -96,6 +128,7 @@ function EventManagement() {
       } else {
         newDate.setMonth(prev.getMonth() + 1);
       }
+      setSelectedDay(1); // Reset selected day when changing months
       return newDate;
     });
   };
@@ -150,7 +183,7 @@ function EventManagement() {
   };
 
   return (
-    <div className="event-management-main">
+    <div className="manage-schedule-main">
       <div className="event-header">
         <div className="view-toggles">
           <button 
@@ -182,142 +215,154 @@ function EventManagement() {
       </div>
 
       {viewMode === 'list' ? (
-        <div className="events-section">
-          <h2 className="events-section-title">Upcoming Events</h2>
-          <div className="events-list">
-            {events.map(event => (
-              <div key={event.id} className="event-card">
-                <div className="event-date">
-                  <div className="event-day">{event.day}</div>
-                  <div className="event-month">{event.month}</div>
+        <div className="calendar-events-layout">
+          {/* Left Column - Calendar */}
+          <div className="calendar-left-column">
+            <div className="calendar-section">
+              <div className="calendar-header-simple">
+                <button className="nav-arrow-simple" onClick={() => navigateMonth('prev')}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <h3 className="calendar-month-year-text">
+                  {formatMonthYear(currentDate)}
+                </h3>
+                <button className="nav-arrow-simple" onClick={() => navigateMonth('next')}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="calendar-grid-compact">
+                <div className="calendar-weekdays-compact">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                    <div key={day} className="weekday-compact">{day}</div>
+                  ))}
                 </div>
-                <div className="event-details">
-                  <h3 className="event-title">{event.title}</h3>
-                  <p className="event-description">{event.description}</p>
-                  <div className="event-info">
-                    <div className="event-location">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path d="M21 10C21 17 12 23 12 23S3 17 3 10C3 5.02944 7.02944 1 12 1C16.9706 1 21 5.02944 21 10Z" stroke="currentColor" strokeWidth="2"/>
-                        <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                      <span>{event.location}</span>
-                    </div>
-                    <div className="event-participants">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M9 11C11.2091 11 13 9.20914 13 7C13 4.79086 11.2091 3 9 3C6.79086 3 5 4.79086 5 7C5 9.20914 6.79086 11 9 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      <span>{event.participants} participants</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="event-status">
-                  <span className={`status-badge ${event.status.toLowerCase()}`}>
-                    {event.status}
-                  </span>
+                <div className="calendar-days-compact">
+                  {(() => {
+                    const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
+                    const days = [];
+                    const year = currentDate.getFullYear();
+                    const month = currentDate.getMonth();
+                    
+                    // Get previous month's last day
+                    const prevMonth = new Date(year, month, 0);
+                    const prevMonthDays = prevMonth.getDate();
+                    
+                    // Adjust starting day (Monday = 0, Sunday = 6)
+                    const adjustedStart = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
+                    
+                    // Days from previous month
+                    for (let i = adjustedStart - 1; i >= 0; i--) {
+                      const day = prevMonthDays - i;
+                      days.push(
+                        <div key={`prev-${day}`} className="calendar-day-compact empty">
+                          <div className="day-number-compact">{day}</div>
+                        </div>
+                      );
+                    }
+                    
+                    // Days of the current month
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      const dayEvents = getEventsForDay(day);
+                      const hasEvents = dayEvents.length > 0;
+                      const isSelected = day === selectedDay && currentDate.getMonth() === month;
+                      
+                      days.push(
+                        <div 
+                          key={day} 
+                          className={`calendar-day-compact ${isSelected ? 'selected' : ''} ${hasEvents ? 'has-events' : ''}`}
+                          onClick={() => setSelectedDay(day)}
+                        >
+                          <div className="day-number-compact">{day}</div>
+                          {hasEvents && <div className="event-dot"></div>}
+                        </div>
+                      );
+                    }
+                    
+                    // Fill remaining cells with next month's days
+                    const totalCells = days.length;
+                    const cellsInGrid = Math.ceil(totalCells / 7) * 7;
+                    const remainingCells = cellsInGrid - totalCells;
+                    for (let i = 1; i <= remainingCells; i++) {
+                      days.push(
+                        <div key={`next-${i}`} className="calendar-day-compact empty">
+                          <div className="day-number-compact">{i}</div>
+                        </div>
+                      );
+                    }
+                    
+                    return days;
+                  })()}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="calendar-section">
-          <div className="calendar-header">
-            <div className="calendar-month-year-selectors">
-              <select 
-                className="month-selector"
-                value={currentDate.getMonth()}
-                onChange={handleMonthChange}
-              >
-                {getMonths().map(month => (
-                  <option key={month.value} value={month.value}>{month.label}</option>
-                ))}
-              </select>
-              <select 
-                className="year-selector"
-                value={currentDate.getFullYear()}
-                onChange={handleYearChange}
-              >
-                {getYears().map(year => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
             </div>
-            <div className="calendar-navigation">
-              <button className="nav-arrow" onClick={() => navigateMonth('prev')}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            
+            {/* Past Events Section */}
+            <div className="past-events-section">
+              <h3 className="past-events-title">Past Event</h3>
+              <div className="past-events-list">
+                {pastEvents.map(event => (
+                  <div key={event.id} className="past-event-item">
+                    <h4 className="past-event-title">{event.title}</h4>
+                    <p className="past-event-description">{event.description}</p>
+                    <span className="past-event-date">{event.date}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Upcoming Events */}
+          <div className="events-right-column">
+            <div className="upcoming-events-header">
+              <button className="nav-arrow-simple" onClick={() => navigateMonth('prev')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              <button className="nav-arrow" onClick={() => navigateMonth('next')}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <h3 className="upcoming-events-title">Upcoming Event</h3>
+              <button className="nav-arrow-simple" onClick={() => navigateMonth('next')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
             </div>
-          </div>
-          
-          <div className="calendar-grid">
-            <div className="calendar-weekdays">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="weekday">{day}</div>
+            
+            <div className="upcoming-events-list">
+              {events
+                .filter(e => {
+                  const eventMonth = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+                  return (e.status === 'Upcoming' || e.status === 'Active') && e.month === eventMonth;
+                })
+                .sort((a, b) => a.day - b.day)
+                .map(event => (
+                <div key={event.id} className="upcoming-event-item">
+                  <div className="upcoming-event-left">
+                    <div className="upcoming-event-date">{event.day} {event.month}</div>
+                    <div className="upcoming-event-time">{event.time}</div>
+                    <div className="upcoming-event-price">{event.price}</div>
+                  </div>
+                  <div className="upcoming-event-content">
+                    <div className="upcoming-event-location">{event.location}</div>
+                    <h4 className="upcoming-event-title">{event.title}</h4>
+                    <p className="upcoming-event-description">{event.description}</p>
+                  </div>
+                  <div className="upcoming-event-arrow">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
               ))}
-            </div>
-            <div className="calendar-days">
-              {(() => {
-                const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
-                const days = [];
-                
-                // Empty cells for days before the first day of the month
-                for (let i = 0; i < startingDayOfWeek; i++) {
-                  days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
-                }
-                
-                // Days of the month
-                for (let day = 1; day <= daysInMonth; day++) {
-                  const dayEvents = getEventsForDay(day);
-                  const isSelected = day === 10 && currentDate.getMonth() === 5; // June 2025
-                  
-                  days.push(
-                    <div 
-                      key={day} 
-                      className={`calendar-day ${isSelected ? 'selected' : ''}`}
-                    >
-                      <div className="day-number">{day}</div>
-                      <div className="day-events">
-                        {dayEvents.map(event => (
-                          <div 
-                            key={event.id} 
-                            className="calendar-event"
-                            style={{ backgroundColor: event.color }}
-                            title={event.title}
-                          >
-                            {event.title.substring(0, 8)}...
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                }
-                
-                return days;
-              })()}
-            </div>
-          </div>
-          
-          <div className="calendar-legend">
-            <div className="legend-item">
-              <div className="legend-color" style={{ backgroundColor: '#6cbca2' }}></div>
-              <span>Recreational</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color" style={{ backgroundColor: '#3b82f6' }}></div>
-              <span>Research</span>
             </div>
           </div>
         </div>
+      ) : (
+        <div></div>
       )}
 
       {/* Create Event Modal */}
@@ -427,4 +472,4 @@ function EventManagement() {
   );
 }
 
-export default EventManagement;
+export default ManageSchedule;

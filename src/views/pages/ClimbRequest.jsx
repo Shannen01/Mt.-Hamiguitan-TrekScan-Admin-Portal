@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import '../style/ClimbRequest.css';
 
 function ClimbRequest() {
@@ -6,6 +6,14 @@ function ClimbRequest() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showFiltersMenu, setShowFiltersMenu] = useState(false);
+  const [showMonthMenu, setShowMonthMenu] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedMonth, setSelectedMonth] = useState('this-month');
+  
+  const filtersRef = useRef(null);
+  const exportRef = useRef(null);
+  const monthRef = useRef(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -167,16 +175,195 @@ function ClimbRequest() {
     );
   };
 
-  const filteredRequests = requests.filter(request =>
-    request.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    request.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (filtersRef.current && !filtersRef.current.contains(event.target)) {
+        setShowFiltersMenu(false);
+      }
+      if (exportRef.current && !exportRef.current.contains(event.target)) {
+        setShowExportMenu(false);
+      }
+      if (monthRef.current && !monthRef.current.contains(event.target)) {
+        setShowMonthMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleExport = (format) => {
+    // Export functionality
+    console.log(`Exporting as ${format}`);
+    alert(`Exporting data as ${format.toUpperCase()}...`);
+    setShowExportMenu(false);
+  };
+
+  const handleFilterChange = (status) => {
+    setSelectedStatus(status);
+    setShowFiltersMenu(false);
+  };
+
+  const handleMonthChange = (month) => {
+    setSelectedMonth(month);
+    setShowMonthMenu(false);
+  };
+
+  const filteredRequests = requests.filter(request => {
+    const matchesSearch = request.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      request.id.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = selectedStatus === 'all' || 
+      request.status.toLowerCase() === selectedStatus.toLowerCase();
+    
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="climb-main">
         {/* Request Management Card */}
         <div className="request-management-card">
           <div className="card-header">
+          </div>
+          
+          {/* Table Header with Search and Actions */}
+          <div className="table-header-bar">
+            <div className="table-search-container">
+              <svg className="table-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <input
+                type="text"
+                className="table-search-input"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <div className="table-actions">
+              {/* Filters Dropdown */}
+              <div className="table-action-dropdown" ref={filtersRef}>
+                <button className="table-action-btn" onClick={() => setShowFiltersMenu(!showFiltersMenu)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <circle cx="8" cy="6" r="2" fill="currentColor"/>
+                    <line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <circle cx="16" cy="18" r="2" fill="currentColor"/>
+                  </svg>
+                  Filters
+                </button>
+                {showFiltersMenu && (
+                  <div className="action-dropdown-menu">
+                    <div className="dropdown-header">Filter by Status</div>
+                    <button 
+                      className={`dropdown-item ${selectedStatus === 'all' ? 'active' : ''}`}
+                      onClick={() => handleFilterChange('all')}
+                    >
+                      All Status
+                    </button>
+                    <button 
+                      className={`dropdown-item ${selectedStatus === 'pending' ? 'active' : ''}`}
+                      onClick={() => handleFilterChange('pending')}
+                    >
+                      Pending
+                    </button>
+                    <button 
+                      className={`dropdown-item ${selectedStatus === 'approved' ? 'active' : ''}`}
+                      onClick={() => handleFilterChange('approved')}
+                    >
+                      Approved
+                    </button>
+                    <button 
+                      className={`dropdown-item ${selectedStatus === 'rejected' ? 'active' : ''}`}
+                      onClick={() => handleFilterChange('rejected')}
+                    >
+                      Rejected
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Export Dropdown */}
+              <div className="table-action-dropdown" ref={exportRef}>
+                <button className="table-action-btn" onClick={() => setShowExportMenu(!showExportMenu)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  Export
+                </button>
+                {showExportMenu && (
+                  <div className="action-dropdown-menu">
+                    <button className="dropdown-item" onClick={() => handleExport('excel')}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
+                        <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2"/>
+                      </svg>
+                      Export as Excel
+                    </button>
+                    <button className="dropdown-item" onClick={() => handleExport('pdf')}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
+                        <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2"/>
+                      </svg>
+                      Export as PDF
+                    </button>
+                    <button className="dropdown-item" onClick={() => handleExport('csv')}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
+                        <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2"/>
+                      </svg>
+                      Export as CSV
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Month Dropdown */}
+              <div className="table-action-dropdown" ref={monthRef}>
+                <button className="table-action-btn" onClick={() => setShowMonthMenu(!showMonthMenu)}>
+                  {selectedMonth === 'this-month' ? 'This Month' : 
+                   selectedMonth === 'last-month' ? 'Last Month' :
+                   selectedMonth === 'this-year' ? 'This Year' : 'This Month'}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <polyline points="6 9 12 15 18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                {showMonthMenu && (
+                  <div className="action-dropdown-menu">
+                    <button 
+                      className={`dropdown-item ${selectedMonth === 'this-month' ? 'active' : ''}`}
+                      onClick={() => handleMonthChange('this-month')}
+                    >
+                      This Month
+                    </button>
+                    <button 
+                      className={`dropdown-item ${selectedMonth === 'last-month' ? 'active' : ''}`}
+                      onClick={() => handleMonthChange('last-month')}
+                    >
+                      Last Month
+                    </button>
+                    <button 
+                      className={`dropdown-item ${selectedMonth === 'this-year' ? 'active' : ''}`}
+                      onClick={() => handleMonthChange('this-year')}
+                    >
+                      This Year
+                    </button>
+                    <button 
+                      className={`dropdown-item ${selectedMonth === 'all-time' ? 'active' : ''}`}
+                      onClick={() => handleMonthChange('all-time')}
+                    >
+                      All Time
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           
           <div className="table-container">
@@ -192,29 +379,47 @@ function ClimbRequest() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRequests.map((request) => (
-                  <tr key={request.id}>
-                    <td className="request-id">{request.id}</td>
-                    <td>{request.name}</td>
-                    <td>{request.requestedDate}</td>
-                    <td>{request.dateSubmitted}</td>
-                    <td>
-                      <span className={`status-badge ${request.status.toLowerCase()}`}>{request.status}</span>
-                    </td>
-                    <td>
-                      <button 
-                        className="view-details-btn"
-                        onClick={() => handleActionClick(request.id, 'view')}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                          <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" strokeWidth="2"/>
-                          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                {filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="table-empty-state">
+                      <div className="empty-state-content">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="empty-state-icon">
+                          <path d="M9 12H15M9 16H15M17 21H7C5.89543 21 5 20.1046 5 19V5C5 3.89543 5.89543 3 7 3H12.5858C12.851 3 13.1054 3.10536 13.2929 3.29289L18.7071 8.70711C18.8946 8.89464 19 9.149 19 9.41421V19C19 20.1046 18.1046 21 17 21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
-                        View Details
-                      </button>
+                        <h3 className="empty-state-title">No requests found</h3>
+                        <p className="empty-state-message">
+                          {searchTerm || selectedStatus !== 'all' 
+                            ? 'Try adjusting your search or filter criteria.' 
+                            : 'There are no climb requests at the moment.'}
+                        </p>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredRequests.map((request) => (
+                    <tr key={request.id}>
+                      <td className="request-id">{request.id}</td>
+                      <td>{request.name}</td>
+                      <td>{request.requestedDate}</td>
+                      <td>{request.dateSubmitted}</td>
+                      <td>
+                        <span className={`status-badge ${request.status.toLowerCase()}`}>{request.status}</span>
+                      </td>
+                      <td>
+                        <button 
+                          className="view-details-btn"
+                          onClick={() => handleActionClick(request.id, 'view')}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" strokeWidth="2"/>
+                            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                          </svg>
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

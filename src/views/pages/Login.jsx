@@ -5,7 +5,7 @@ import ApiClient from '../../models/ApiClient.js';
 import { config } from '../../config/config.js';
 import '../style/Login.css';
 import logoImage from '../../assets/Logo_admin_portal.png';
-import trekScanText from '../../assets/TrekScan+_Text.png';
+import trekScanText from '../../assets/TrekScan_welomelogo.png';
 
 // Login page component
 function Login({ onLoginSuccess }) {
