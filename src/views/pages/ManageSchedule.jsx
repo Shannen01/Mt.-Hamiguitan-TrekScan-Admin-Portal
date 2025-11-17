@@ -24,7 +24,7 @@ function ManageSchedule() {
       id: 1,
       day: 31,
       month: 'OCT',
-      title: 'Design system update',
+      title: 'Trek Alliance',
       description: 'Design system update event',
       location: 'Mt. Hamiguitan',
       participants: 25,
@@ -38,7 +38,7 @@ function ManageSchedule() {
       id: 2,
       day: 2,
       month: 'NOV',
-      title: 'Wireframe for ios app',
+      title: 'HighTrail Partners',
       description: 'Wireframe event',
       location: 'Mt. Hamiguitan Base Camp',
       participants: 15,
@@ -52,7 +52,7 @@ function ManageSchedule() {
       id: 3,
       day: 3,
       month: 'NOV',
-      title: 'Brand guideline product',
+      title: 'Summit Explorers Network',
       description: 'Brand guideline event',
       location: 'Mt. Hamiguitan Trails',
       participants: 40,
@@ -66,7 +66,7 @@ function ManageSchedule() {
       id: 4,
       day: 4,
       month: 'NOV',
-      title: 'Brand guideline product',
+      title: 'EcoTrek Alliance',
       description: 'Brand guideline event',
       location: 'Mt. Hamiguitan Camp Site',
       participants: 18,
@@ -80,7 +80,7 @@ function ManageSchedule() {
       id: 5,
       day: 6,
       month: 'NOV',
-      title: 'Website product ui design kit',
+      title: 'Mountain Path Association',
       description: 'Website design event',
       location: 'Mt. Hamiguitan Range',
       participants: 12,
@@ -94,7 +94,7 @@ function ManageSchedule() {
       id: 6,
       day: 8,
       month: 'NOV',
-      title: 'Quicky product promotion',
+      title: 'Wilderness Trek Council',
       description: 'Product promotion event',
       location: 'Mt. Hamiguitan',
       participants: 20,
@@ -108,7 +108,7 @@ function ManageSchedule() {
       id: 7,
       day: 10,
       month: 'NOV',
-      title: 'Website product ui design kit',
+      title: 'Mountain Path Association',
       description: 'Website design event',
       location: 'Mt. Hamiguitan',
       participants: 15,
@@ -122,7 +122,7 @@ function ManageSchedule() {
       id: 8,
       day: 12,
       month: 'NOV',
-      title: 'Quicky product promotion',
+      title: 'TrailGuard Affiliation',
       description: 'Product promotion event',
       location: 'Mt. Hamiguitan',
       participants: 18,
@@ -136,7 +136,7 @@ function ManageSchedule() {
       id: 9,
       day: 14,
       month: 'NOV',
-      title: 'Website product ui design kit',
+      title: 'Mountain Path Association',
       description: 'Website design event',
       location: 'Mt. Hamiguitan',
       participants: 22,
@@ -150,7 +150,7 @@ function ManageSchedule() {
       id: 10,
       day: 16,
       month: 'NOV',
-      title: 'Brand guideline product',
+      title: 'Summit Explorers Network',
       description: 'Brand guideline event',
       location: 'Mt. Hamiguitan',
       participants: 25,
@@ -164,7 +164,7 @@ function ManageSchedule() {
       id: 11,
       day: 18,
       month: 'NOV',
-      title: 'Website product ui design kit',
+      title: 'Mountain Path Association',
       description: 'Website design event',
       location: 'Mt. Hamiguitan',
       participants: 20,
@@ -178,7 +178,7 @@ function ManageSchedule() {
       id: 12,
       day: 20,
       month: 'NOV',
-      title: 'Wireframe for ios app',
+      title: 'HighTrail Partners',
       description: 'Wireframe event',
       location: 'Mt. Hamiguitan',
       participants: 15,
@@ -192,7 +192,7 @@ function ManageSchedule() {
       id: 13,
       day: 22,
       month: 'NOV',
-      title: 'Quicky product promotion',
+      title: 'TrailGuard Affiliation',
       description: 'Product promotion event',
       location: 'Mt. Hamiguitan',
       participants: 18,
@@ -206,7 +206,7 @@ function ManageSchedule() {
       id: 14,
       day: 24,
       month: 'NOV',
-      title: 'Real estate website project',
+      title: 'Peak Journey Collective',
       description: 'Real estate project event',
       location: 'Mt. Hamiguitan',
       participants: 30,
@@ -220,7 +220,7 @@ function ManageSchedule() {
       id: 15,
       day: 26,
       month: 'NOV',
-      title: 'Quicky product promotion',
+      title: 'TrailGuard Affiliation',
       description: 'Product promotion event',
       location: 'Mt. Hamiguitan',
       participants: 20,
@@ -234,7 +234,7 @@ function ManageSchedule() {
       id: 16,
       day: 28,
       month: 'NOV',
-      title: 'Brand guideline product',
+      title: 'Summit Explorers Network',
       description: 'Brand guideline event',
       location: 'Mt. Hamiguitan',
       participants: 25,
@@ -248,7 +248,7 @@ function ManageSchedule() {
       id: 17,
       day: 30,
       month: 'NOV',
-      title: 'Wireframe for ios app',
+      title: 'HighTrail Partners',
       description: 'Wireframe event',
       location: 'Mt. Hamiguitan',
       participants: 15,
@@ -262,7 +262,7 @@ function ManageSchedule() {
       id: 18,
       day: 2,
       month: 'DEC',
-      title: 'Brand guideline product',
+      title: 'Summit Explorers Network',
       description: 'Brand guideline event',
       location: 'Mt. Hamiguitan',
       participants: 22,
@@ -276,7 +276,7 @@ function ManageSchedule() {
       id: 19,
       day: 4,
       month: 'DEC',
-      title: 'Real estate website project',
+      title: 'Peak Journey Collective',
       description: 'Real estate project event',
       location: 'Mt. Hamiguitan',
       participants: 28,
@@ -912,20 +912,33 @@ function ManageSchedule() {
                   );
                 }
                 
-                return filteredEvents.map(event => (
-                  <div key={event.id} className="upcoming-event-item">
-                    <div className="upcoming-event-left">
-                      <div className="upcoming-event-date">{event.day} {event.month}</div>
-                      <div className="upcoming-event-time">{event.time}</div>
-                      <div className="upcoming-event-price">{event.price}</div>
+                return filteredEvents.map(event => {
+                  // Map status: Upcoming -> pending, Active -> approved
+                  // For demo, we'll use the existing status and map it
+                  const getStatusDisplay = (status) => {
+                    if (status === 'Upcoming') return 'Pending';
+                    if (status === 'Active') return 'Approved';
+                    return status;
+                  };
+                  
+                  const statusDisplay = getStatusDisplay(event.status);
+                  
+                  return (
+                    <div key={event.id} className="upcoming-event-item">
+                      <div className="upcoming-event-left">
+                        <div className="upcoming-event-date">{event.day} {event.month}</div>
+                      </div>
+                      <div className="upcoming-event-content">
+                        <div className="upcoming-event-location">Mt. Hamiguitan</div>
+                        <div className="upcoming-event-affiliation">{event.title}</div>
+                        <div className="upcoming-event-trekkers">{event.participants} Trekkers</div>
+                      </div>
+                      <div className="upcoming-event-right">
+                        <div className={`upcoming-event-status status-${statusDisplay.toLowerCase()}`} data-status={statusDisplay}>{statusDisplay}</div>
+                      </div>
                     </div>
-                    <div className="upcoming-event-content">
-                      <div className="upcoming-event-location">{event.location}</div>
-                      <h4 className="upcoming-event-title">{event.title}</h4>
-                      <p className="upcoming-event-description">{event.description}</p>
-                    </div>
-                  </div>
-                ));
+                  );
+                });
               })()}
             </div>
           </div>
