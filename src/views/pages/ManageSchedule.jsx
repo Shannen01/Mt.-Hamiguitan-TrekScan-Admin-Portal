@@ -1,19 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import HighlightOffIcon from '@mui/icons-material/HighlightOff';
+import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import FilterListAltIcon from '@mui/icons-material/FilterListAlt';
+import SearchIcon from '@mui/icons-material/Search';
+import EventNoteIcon from '@mui/icons-material/EventNote';
 import '../style/ManageSchedule.css';
 
 function ManageSchedule() {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
   const [currentDate, setCurrentDate] = useState(new Date(2022, 10, 1)); // November 2022
   const [selectedDay, setSelectedDay] = useState(10);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    type: 'Trek',
-    date: '',
-    maxParticipants: '25',
-    location: '',
-    description: ''
-  });
+  const [selectedFilter, setSelectedFilter] = useState('all'); // 'all', 'completed', 'approve', 'canceled', 'pending'
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showMonthYearDropdown, setShowMonthYearDropdown] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const filterRef = useRef(null);
+  const monthYearRef = useRef(null);
 
   const events = [
     {
@@ -359,12 +363,18 @@ function ManageSchedule() {
     const newDate = new Date(currentDate);
     newDate.setMonth(parseInt(e.target.value));
     setCurrentDate(newDate);
+    setShowMonthYearDropdown(false);
   };
 
   const handleYearChange = (e) => {
     const newDate = new Date(currentDate);
     newDate.setFullYear(parseInt(e.target.value));
     setCurrentDate(newDate);
+    setShowMonthYearDropdown(false);
+  };
+
+  const formatMonthYearDisplay = (date) => {
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
   const getMonths = () => {
@@ -393,6 +403,100 @@ function ManageSchedule() {
     return years;
   };
 
+  const getFilterLabel = () => {
+    switch(selectedFilter) {
+      case 'all': return 'All Status';
+      case 'completed': return 'Completed';
+      case 'approve': return 'Approve';
+      case 'canceled': return 'Canceled';
+      case 'pending': return 'Pending';
+      default: return 'All Status';
+    }
+  };
+
+  // Calculate event counts by status
+  const getEventCounts = () => {
+    const eventMonth = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    const monthEvents = events.filter(e => e.month === eventMonth);
+    
+    // Map events to status categories
+    // For now, using sample counts - in real app, events would have explicit status
+    const completed = monthEvents.filter(e => e.status === 'Active' || e.id % 3 === 0).length || 12;
+    const pending = monthEvents.filter(e => e.status === 'Upcoming' && e.id % 4 === 0).length || 5;
+    const cancelled = monthEvents.filter(e => e.id % 7 === 0).length || 3;
+    const approved = monthEvents.filter(e => e.status === 'Upcoming' && e.id % 5 === 0).length || 8;
+    
+    return {
+      completed: completed,
+      pending: pending,
+      cancelled: cancelled,
+      approved: approved
+    };
+  };
+
+  const eventCounts = getEventCounts();
+  const totalEvents = eventCounts.completed + eventCounts.pending + eventCounts.cancelled + eventCounts.approved;
+  const overallProgress = totalEvents > 0 ? Math.round((eventCounts.completed / totalEvents) * 100) : 0;
+
+  // Calculate slot availability for calendar view
+  const getSlotAvailability = () => {
+    const eventMonth = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    const monthEvents = events.filter(e => e.month === eventMonth);
+    
+    // Assume max capacity per day is 50 (can be adjusted)
+    const MAX_CAPACITY = 50;
+    
+    let available = 0; // Green - 0-30% booked
+    let limited = 0;   // Yellow/Orange - 30-80% booked
+    let full = 0;      // Red - 80-100% booked
+    
+    // Group events by day
+    const eventsByDay = {};
+    monthEvents.forEach(event => {
+      if (!eventsByDay[event.day]) {
+        eventsByDay[event.day] = 0;
+      }
+      eventsByDay[event.day] += event.participants || 0;
+    });
+    
+    // Count days by availability status
+    Object.values(eventsByDay).forEach(participants => {
+      const percentage = (participants / MAX_CAPACITY) * 100;
+      if (percentage < 30) {
+        available++;
+      } else if (percentage < 80) {
+        limited++;
+      } else {
+        full++;
+      }
+    });
+    
+    // Count days with no events as available
+    const { daysInMonth } = getDaysInMonth(currentDate);
+    const daysWithEvents = Object.keys(eventsByDay).length;
+    available += (daysInMonth - daysWithEvents);
+    
+    return { available, limited, full };
+  };
+
+  const slotAvailability = getSlotAvailability();
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setShowFilterDropdown(false);
+      }
+      if (monthYearRef.current && !monthYearRef.current.contains(e.target)) {
+        setShowMonthYearDropdown(false);
+      }
+    }
+    if (showFilterDropdown || showMonthYearDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showFilterDropdown, showMonthYearDropdown]);
+
   return (
     <div className="manage-schedule-main">
       <div className="event-header">
@@ -416,17 +520,140 @@ function ManageSchedule() {
             Calendar View
           </button>
         </div>
-        <button className="create-event-btn" onClick={() => setShowCreateForm(true)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          Create Event
-        </button>
       </div>
 
       {viewMode === 'list' ? (
-        <div className="calendar-events-layout">
+        <div>
+          {/* Filter Section */}
+          <div className="schedule-filters-section">
+            <div className="schedule-left-filters">
+              <div className="schedule-date-range-selector" ref={monthYearRef}>
+                <button 
+                  className="month-year-selector-btn"
+                  onClick={() => setShowMonthYearDropdown(!showMonthYearDropdown)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="calendar-icon-filter">
+                    <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
+                      </svg>
+                  <span className="date-range-text">{formatMonthYearDisplay(currentDate)}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="chevron-down">
+                    <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                </button>
+                {showMonthYearDropdown && (
+                  <div className="month-year-dropdown-menu">
+                    <div className="month-year-selectors">
+              <select 
+                className="month-selector"
+                value={currentDate.getMonth()}
+                onChange={handleMonthChange}
+              >
+                {getMonths().map(month => (
+                  <option key={month.value} value={month.value}>{month.label}</option>
+                ))}
+              </select>
+              <select 
+                className="year-selector"
+                value={currentDate.getFullYear()}
+                onChange={handleYearChange}
+              >
+                {getYears().map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+                  </div>
+                )}
+              </div>
+              <div className="schedule-search-container">
+                <SearchIcon className="search-icon" />
+                <input
+                  type="text"
+                  className="schedule-search-input"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="schedule-filters-group" ref={filterRef}>
+              <div className="filter-dropdown-container">
+                <button 
+                  className="filter-dropdown-btn"
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="filter-icon">
+                    <path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  Filters
+                </button>
+                {showFilterDropdown && (
+                  <div className="filter-dropdown-menu">
+                    <div className="filter-dropdown-header">FILTER BY STATUS</div>
+                    <button 
+                      className={`filter-dropdown-item ${selectedFilter === 'all' ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedFilter('all');
+                        setShowFilterDropdown(false);
+                      }}
+                    >
+                      <FilterListAltIcon className="filter-icon-all" />
+                      All Status
+                    </button>
+                    <button 
+                      className={`filter-dropdown-item ${selectedFilter === 'completed' ? 'active' : ''}`}
+                      data-filter="completed"
+                      onClick={() => {
+                        setSelectedFilter('completed');
+                        setShowFilterDropdown(false);
+                      }}
+                    >
+                      <CheckCircleIcon className="filter-icon-completed" />
+                      Completed
+                    </button>
+                    <button 
+                      className={`filter-dropdown-item ${selectedFilter === 'approve' ? 'active' : ''}`}
+                      data-filter="approve"
+                      onClick={() => {
+                        setSelectedFilter('approve');
+                        setShowFilterDropdown(false);
+                      }}
+                    >
+                      <TaskAltIcon className="filter-icon-approve" />
+                      Approve
+                    </button>
+                    <button 
+                      className={`filter-dropdown-item ${selectedFilter === 'canceled' ? 'active' : ''}`}
+                      data-filter="canceled"
+                      onClick={() => {
+                        setSelectedFilter('canceled');
+                        setShowFilterDropdown(false);
+                      }}
+                    >
+                      <HighlightOffIcon className="filter-icon-canceled" />
+                      Canceled
+                    </button>
+                    <button 
+                      className={`filter-dropdown-item ${selectedFilter === 'pending' ? 'active' : ''}`}
+                      data-filter="pending"
+                      onClick={() => {
+                        setSelectedFilter('pending');
+                        setShowFilterDropdown(false);
+                      }}
+                    >
+                      <AccessTimeIcon className="filter-icon-pending" />
+                      Pending
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="calendar-events-layout">
           {/* Left Column - Calendar */}
           <div className="calendar-left-column">
             <div className="calendar-section">
@@ -511,6 +738,144 @@ function ManageSchedule() {
                 </div>
               </div>
             </div>
+            
+            {/* Slot Availability Indicator */}
+            <div className="slot-availability-indicator slot-availability-compact">
+              <div className="slot-indicator-item">
+                <div className="slot-indicator-line available"></div>
+                <span className="slot-indicator-label">Available</span>
+              </div>
+              <div className="slot-indicator-item">
+                <div className="slot-indicator-line limited"></div>
+                <span className="slot-indicator-label">Limited Slots</span>
+              </div>
+              <div className="slot-indicator-item">
+                <div className="slot-indicator-line full"></div>
+                <span className="slot-indicator-label">Full</span>
+              </div>
+            </div>
+            
+            {/* Category Buttons */}
+            <div className="calendar-categories">
+              <h3 className="categories-title">Categories</h3>
+              
+              {/* Status Cards */}
+              <div className="category-status-cards">
+                <div className="category-status-left">
+                  <button 
+                    className={`category-status-card completed ${selectedFilter === 'completed' ? 'active' : ''}`}
+                    onClick={() => setSelectedFilter('completed')}
+                  >
+                    <div className="category-status-icon" style={{ backgroundColor: '#10b981' }}>
+                      <CheckCircleIcon style={{ color: '#ffffff', fontSize: '20px' }} />
+                    </div>
+                    <div className="category-status-info">
+                      <div className="category-status-title">Completed</div>
+                      <div className="category-status-count">{eventCounts.completed} total bookings</div>
+                    </div>
+                    <div className="category-status-indicator" style={{ backgroundColor: '#10b981' }}></div>
+                  </button>
+                  
+                  <button 
+                    className={`category-status-card canceled ${selectedFilter === 'canceled' ? 'active' : ''}`}
+                    onClick={() => setSelectedFilter('canceled')}
+                  >
+                    <div className="category-status-icon" style={{ backgroundColor: '#ef4444' }}>
+                      <HighlightOffIcon style={{ color: '#ffffff', fontSize: '20px' }} />
+                    </div>
+                    <div className="category-status-info">
+                      <div className="category-status-title">Cancelled</div>
+                      <div className="category-status-count">{eventCounts.cancelled} total bookings</div>
+                    </div>
+                    <div className="category-status-indicator" style={{ backgroundColor: '#ef4444' }}></div>
+                  </button>
+                </div>
+                
+                <div className="category-status-right">
+                  <button 
+                    className={`category-status-card pending ${selectedFilter === 'pending' ? 'active' : ''}`}
+                    onClick={() => setSelectedFilter('pending')}
+                  >
+                    <div className="category-status-icon" style={{ backgroundColor: '#f59e0b' }}>
+                      <AccessTimeIcon style={{ color: '#ffffff', fontSize: '20px' }} />
+                    </div>
+                    <div className="category-status-info">
+                      <div className="category-status-title">Pending</div>
+                      <div className="category-status-count">{eventCounts.pending} total bookings</div>
+                    </div>
+                    <div className="category-status-indicator" style={{ backgroundColor: '#f59e0b' }}></div>
+                  </button>
+                  
+                  <button 
+                    className={`category-status-card approve ${selectedFilter === 'approve' ? 'active' : ''}`}
+                    onClick={() => setSelectedFilter('approve')}
+                  >
+                    <div className="category-status-icon" style={{ backgroundColor: '#3b82f6' }}>
+                      <TaskAltIcon style={{ color: '#ffffff', fontSize: '20px' }} />
+                    </div>
+                    <div className="category-status-info">
+                      <div className="category-status-title">Approved</div>
+                      <div className="category-status-count">{eventCounts.approved} total bookings</div>
+                    </div>
+                    <div className="category-status-indicator" style={{ backgroundColor: '#3b82f6' }}></div>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Summary Card */}
+              <div className="category-summary-card">
+                <div className="summary-row">
+                  <span className="summary-label">Total Bookings</span>
+                  <span className="summary-value">{totalEvents}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-label">Overall Progress</span>
+                  <span className="summary-value">{overallProgress}%</span>
+                </div>
+                <div className="progress-bar-container">
+                  <div className="progress-bar">
+                    <div 
+                      className="progress-segment completed" 
+                      style={{ width: `${(eventCounts.completed / totalEvents) * 100}%` }}
+                    ></div>
+                    <div 
+                      className="progress-segment pending" 
+                      style={{ width: `${(eventCounts.pending / totalEvents) * 100}%` }}
+                    ></div>
+                    <div 
+                      className="progress-segment approved" 
+                      style={{ width: `${(eventCounts.approved / totalEvents) * 100}%` }}
+                    ></div>
+                    <div 
+                      className="progress-segment cancelled" 
+                      style={{ width: `${(eventCounts.cancelled / totalEvents) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="progress-legend">
+                  <div className="legend-left">
+                    <div className="legend-item">
+                      <div className="legend-dot" style={{ backgroundColor: '#10b981' }}></div>
+                      <span>Completed</span>
+                    </div>
+                    <div className="legend-item">
+                      <div className="legend-dot" style={{ backgroundColor: '#ef4444' }}></div>
+                      <span>Cancelled</span>
+                    </div>
+                  </div>
+                  <div className="legend-right">
+                    <div className="legend-item">
+                      <div className="legend-dot" style={{ backgroundColor: '#f59e0b' }}></div>
+                      <span>Pending</span>
+                    </div>
+                    <div className="legend-item">
+                      <div className="legend-dot" style={{ backgroundColor: '#3b82f6' }}></div>
+                      <span>Approved</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Right Column - Upcoming Events */}
@@ -521,7 +886,7 @@ function ManageSchedule() {
                   <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              <h3 className="upcoming-events-title">Upcoming Event</h3>
+              <h3 className="upcoming-events-title">Scheduled Bookings</h3>
               <button className="nav-arrow-simple" onClick={() => navigateMonth('next')}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -530,32 +895,40 @@ function ManageSchedule() {
             </div>
             
             <div className="upcoming-events-list">
-              {events
-                .filter(e => {
-                  const eventMonth = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-                  return (e.status === 'Upcoming' || e.status === 'Active') && e.month === eventMonth;
-                })
-                .sort((a, b) => a.day - b.day)
-                .map(event => (
-                <div key={event.id} className="upcoming-event-item">
-                  <div className="upcoming-event-left">
-                    <div className="upcoming-event-date">{event.day} {event.month}</div>
-                    <div className="upcoming-event-time">{event.time}</div>
-                    <div className="upcoming-event-price">{event.price}</div>
+              {(() => {
+                const eventMonth = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+                const filteredEvents = events
+                  .filter(e => {
+                    return (e.status === 'Upcoming' || e.status === 'Active') && e.month === eventMonth;
+                  })
+                  .sort((a, b) => a.day - b.day);
+                
+                if (filteredEvents.length === 0) {
+                  return (
+                    <div className="no-bookings-message">
+                      <EventNoteIcon className="no-bookings-icon" />
+                      <p>No scheduled booking for this month</p>
+                    </div>
+                  );
+                }
+                
+                return filteredEvents.map(event => (
+                  <div key={event.id} className="upcoming-event-item">
+                    <div className="upcoming-event-left">
+                      <div className="upcoming-event-date">{event.day} {event.month}</div>
+                      <div className="upcoming-event-time">{event.time}</div>
+                      <div className="upcoming-event-price">{event.price}</div>
+                    </div>
+                    <div className="upcoming-event-content">
+                      <div className="upcoming-event-location">{event.location}</div>
+                      <h4 className="upcoming-event-title">{event.title}</h4>
+                      <p className="upcoming-event-description">{event.description}</p>
+                    </div>
                   </div>
-                  <div className="upcoming-event-content">
-                    <div className="upcoming-event-location">{event.location}</div>
-                    <h4 className="upcoming-event-title">{event.title}</h4>
-                    <p className="upcoming-event-description">{event.description}</p>
-                  </div>
-                  <div className="upcoming-event-arrow">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
+          </div>
           </div>
         </div>
       ) : (
@@ -581,7 +954,7 @@ function ManageSchedule() {
               </button>
             </div>
           </div>
-
+          
           {/* Calendar Grid */}
           <div className="calendar-view-grid">
             <div className="calendar-weekdays-header">
@@ -631,7 +1004,7 @@ function ManageSchedule() {
                       onClick={() => setSelectedDay(day)}
                     >
                       <div className="calendar-day-number">{day}</div>
-                    </div>
+                          </div>
                   );
                 }
                 
@@ -651,112 +1024,25 @@ function ManageSchedule() {
               })()}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Create Event Modal */}
-      {showCreateForm && (
-        <div className="create-event-modal" onClick={() => setShowCreateForm(false)}>
-          <div className="create-event-card" onClick={(e) => e.stopPropagation()}>
-            <h2 className="create-event-title">Create New Event</h2>
-            
-            <form className="create-event-form" onSubmit={(e) => {
-              e.preventDefault();
-              // Handle form submission here
-              console.log('Form submitted:', formData);
-              setShowCreateForm(false);
-            }}>
-              <div className="form-field">
-                <label>Event Title</label>
-                <input
-                  type="text"
-                  placeholder="Enter event name"
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  required
-                />
-              </div>
-
-              <div className="form-field">
-                <label>Event Type</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value})}
-                  required
-                >
-                  <option value="Trek">Trek</option>
-                  <option value="Workshop">Workshop</option>
-                  <option value="Camping">Camping</option>
-                  <option value="Training">Training</option>
-                  <option value="Community">Community</option>
-                </select>
-              </div>
-
-              <div className="form-field">
-                <label>Date</label>
-                <div className="date-input-wrapper">
-                  <input
-                    type="text"
-                    placeholder="dd/mm/yyyy"
-                    value={formData.date}
-                    onChange={(e) => setFormData({...formData, date: e.target.value})}
-                    required
-                  />
-                  <svg className="calendar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-                    <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
-                    <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
-                    <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
-                  </svg>
-                </div>
-              </div>
-
-              <div className="form-field">
-                <label>Max Participants</label>
-                <input
-                  type="number"
-                  value={formData.maxParticipants}
-                  onChange={(e) => setFormData({...formData, maxParticipants: e.target.value})}
-                  required
-                />
-              </div>
-
-              <div className="form-field">
-                <label>Location</label>
-                <input
-                  type="text"
-                  placeholder="Enter location"
-                  value={formData.location}
-                  onChange={(e) => setFormData({...formData, location: e.target.value})}
-                  required
-                />
-              </div>
-
-              <div className="form-field">
-                <label>Description</label>
-                <textarea
-                  placeholder="Event description..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  rows="4"
-                  required
-                />
-              </div>
-
-              <div className="form-actions">
-                <button type="submit" className="create-btn">Create Event</button>
-                <button 
-                  type="button" 
-                  className="cancel-btn"
-                  onClick={() => setShowCreateForm(false)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+          
+          {/* Slot Availability Indicator */}
+          <div className="slot-availability-indicator">
+            <div className="slot-indicator-item">
+              <div className="slot-indicator-line available"></div>
+              <span className="slot-indicator-label">Available</span>
+            </div>
+            <div className="slot-indicator-item">
+              <div className="slot-indicator-line limited"></div>
+              <span className="slot-indicator-label">Limited Slots</span>
+            </div>
+            <div className="slot-indicator-item">
+              <div className="slot-indicator-line full"></div>
+              <span className="slot-indicator-label">Full</span>
+            </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
