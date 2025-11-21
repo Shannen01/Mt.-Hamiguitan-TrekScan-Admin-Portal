@@ -998,33 +998,49 @@
 
 .booking-count-badge-compact {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  background: #30622f;
+  top: 6px;
+  right: 6px;
+  background: linear-gradient(135deg, #30622f 0%, #255020 100%);
   color: #ffffff;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 5px;
-  border-radius: 10px;
-  min-width: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 7px;
+  border-radius: 12px;
+  min-width: 22px;
+  height: 22px;
   text-align: center;
-  line-height: 1.2;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(48, 98, 47, 0.2);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+}
+
+.calendar-day-compact:hover .booking-count-badge-compact {
+  transform: scale(1.05);
+  box-shadow: 0 3px 6px rgba(48, 98, 47, 0.3);
 }
 
 .calendar-day-compact.selected .booking-count-badge-compact {
-  background: #ffffff;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
   color: #30622f;
+  border-color: #30622f;
+  box-shadow: 0 2px 4px rgba(48, 98, 47, 0.15);
 }
 
 .calendar-day-compact.has-cancelled .booking-count-badge-compact,
 .booking-count-badge-compact.cancelled {
-  background: #ef4444;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: #ffffff;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
 }
 
 .calendar-day-compact.has-cancelled.selected .booking-count-badge-compact {
-  background: #ffffff;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
   color: #ef4444;
+  border-color: #ef4444;
 }
 
 /* Past Events Section */
@@ -1426,33 +1442,45 @@
 }
 
 .calendar-day-booking-count {
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
-  margin-top: 4px;
-  padding: 4px 8px;
-  background: rgba(48, 98, 47, 0.1);
-  border-radius: 6px;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, rgba(48, 98, 47, 0.08) 0%, rgba(48, 98, 47, 0.12) 100%);
+  border: 1px solid rgba(48, 98, 47, 0.2);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.calendar-day-cell:hover .calendar-day-booking-count {
+  background: linear-gradient(135deg, rgba(48, 98, 47, 0.12) 0%, rgba(48, 98, 47, 0.16) 100%);
+  border-color: rgba(48, 98, 47, 0.3);
+  transform: translateY(-1px);
 }
 
 .booking-count-number {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: #30622f;
   line-height: 1;
+  letter-spacing: -0.5px;
 }
 
 .booking-count-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: #6b7280;
   text-transform: lowercase;
   line-height: 1;
+  letter-spacing: 0.2px;
 }
 
 .calendar-day-cell.selected .calendar-day-booking-count {
-  background: rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.35) 100%);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .calendar-day-cell.selected .booking-count-number {
@@ -1460,7 +1488,7 @@
 }
 
 .calendar-day-cell.selected .booking-count-label {
-  color: #ffffff;
+  color: #374151;
 }
 
 .calendar-day-cell.has-cancelled .calendar-day-booking-count,
