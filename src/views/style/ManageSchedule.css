@@ -996,6 +996,37 @@
   background: #ffffff;
 }
 
+.booking-count-badge-compact {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #30622f;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.calendar-day-compact.selected .booking-count-badge-compact {
+  background: #ffffff;
+  color: #30622f;
+}
+
+.calendar-day-compact.has-cancelled .booking-count-badge-compact,
+.booking-count-badge-compact.cancelled {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.calendar-day-compact.has-cancelled.selected .booking-count-badge-compact {
+  background: #ffffff;
+  color: #ef4444;
+}
+
 /* Past Events Section */
 .past-events-section {
   background: #ffffff;
@@ -1392,6 +1423,96 @@
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 4px;
+}
+
+.calendar-day-booking-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(48, 98, 47, 0.1);
+  border-radius: 6px;
+}
+
+.booking-count-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: #30622f;
+  line-height: 1;
+}
+
+.booking-count-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: lowercase;
+  line-height: 1;
+}
+
+.calendar-day-cell.selected .calendar-day-booking-count {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.calendar-day-cell.selected .booking-count-number {
+  color: #30622f;
+}
+
+.calendar-day-cell.selected .booking-count-label {
+  color: #ffffff;
+}
+
+.calendar-day-cell.has-cancelled .calendar-day-booking-count,
+.calendar-day-booking-count.cancelled {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.calendar-day-cell.has-cancelled .booking-count-number,
+.calendar-day-booking-count.cancelled .booking-count-number {
+  color: #ef4444;
+}
+
+.calendar-day-cell.has-cancelled.selected .calendar-day-booking-count {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+}
+
+.calendar-day-cell.has-cancelled.selected .booking-count-number {
+  color: #ef4444;
+}
+
+.calendar-day-cell.has-cancelled.selected .booking-count-label {
+  color: #ffffff;
+}
+
+/* Calendar Day Bookings Section */
+.calendar-day-bookings-section {
+  margin-top: 32px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.calendar-day-bookings-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.calendar-day-bookings-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.calendar-day-bookings-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 16px 24px;
 }
 
 /* Slot Availability Indicator */

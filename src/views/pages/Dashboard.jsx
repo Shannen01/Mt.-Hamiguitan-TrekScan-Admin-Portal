@@ -8,53 +8,62 @@ import { Timestamp } from 'firebase/firestore';
 import '../style/Reports.css';
 
 function Dashboard({ onNavigate }) {
-  // Generate dates from Oct 1 to Oct 30 with realistic trekking groups
-  const generateTrekActivity = React.useCallback(() => {
+  const [trekActivityData, setTrekActivityData] = useState({ days: [], values: [] });
+  const [trekActivityStats, setTrekActivityStats] = useState({
+    peakActivity: { value: 0, date: '' },
+    averageDaily: 0,
+    capacityUsed: 0
+  });
+  
+  // Generate trek activity data from approved bookings over the past 30 days
+  const generateTrekActivity = React.useCallback((approvedBookings) => {
     const days = [];
     const values = [];
     
-    // Generate dates from Oct 1 to Oct 30
-    const startDate = new Date(2024, 9, 1); // Oct 1, 2024 (month 9 = October)
-    const endDate = new Date(2024, 9, 30);   // Oct 30, 2024 (month 9 = October)
+    // Get date range: past 30 days
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 29); // 30 days including today
+    startDate.setHours(0, 0, 0, 0);
     
-    // Define trekking groups: each group starts every 3 days and lasts 3 days
-    const groups = [
-      { startDay: 0, size: 8 },   // Sep 11-13: 8 trekkers
-      { startDay: 3, size: 12 },  // Sep 14-16: 12 trekkers  
-      { startDay: 6, size: 6 },   // Sep 17-19: 6 trekkers
-      { startDay: 9, size: 15 },  // Sep 20-22: 15 trekkers
-      { startDay: 12, size: 10 }, // Sep 23-25: 10 trekkers
-      { startDay: 15, size: 18 }, // Sep 26-28: 18 trekkers
-      { startDay: 18, size: 7 },  // Sep 29-Oct 1: 7 trekkers
-      { startDay: 21, size: 14 }, // Oct 2-4: 14 trekkers
-      { startDay: 24, size: 9 },  // Oct 5-7: 9 trekkers
-      { startDay: 27, size: 11 }, // Oct 8-10: 11 trekkers
-    ];
+    // Group approved bookings by trekDate
+    const bookingsByDate = {};
     
-    for (let d = new Date(startDate), dayIndex = 0; d <= endDate; d.setDate(d.getDate() + 1), dayIndex++) {
+    approvedBookings.forEach(booking => {
+      if (!booking.trekDate) return;
+      
+      const trekDate = booking.trekDate instanceof Timestamp 
+        ? booking.trekDate.toDate() 
+        : new Date(booking.trekDate);
+      
+      // Only include bookings within the past 30 days
+      if (trekDate >= startDate && trekDate <= endDate) {
+        const dateKey = trekDate.toDateString();
+        if (!bookingsByDate[dateKey]) {
+          bookingsByDate[dateKey] = 0;
+        }
+        bookingsByDate[dateKey] += 1; // Count each booking as 1 trekker
+      }
+    });
+    
+    // Generate data for each day in the range
+    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       days.push(label);
       
-      // Calculate total active trekkers for this day
-      let totalTrekkers = 0;
-      groups.forEach(group => {
-        // Check if this group is active on this day (starts on startDay, lasts 3 days)
-        if (dayIndex >= group.startDay && dayIndex < group.startDay + 3) {
-          totalTrekkers += group.size;
-        }
-      });
-      
-      // Cap at 40 for display purposes
-      const value = Math.min(40, totalTrekkers);
-      values.push(value);
+      const dateKey = d.toDateString();
+      const count = bookingsByDate[dateKey] || 0;
+      values.push(count);
     }
+    
     return { days, values };
   }, []);
-
-  const { days, values } = generateTrekActivity();
   
   // Calculate accurate total of active trekkers from the chart data
-  const totalActiveTrekkers = values.reduce((sum, value) => sum + value, 0);
+  const totalActiveTrekkers = trekActivityData.values.length > 0 
+    ? trekActivityData.values.reduce((sum, value) => sum + value, 0) 
+    : 0;
 
   // Chart dimensions
   const width = 900; // responsive via viewBox
@@ -62,10 +71,13 @@ function Dashboard({ onNavigate }) {
   const padding = { top: 30, right: 24, bottom: 40, left: 44 };
   const innerW = width - padding.left - padding.right;
   const innerH = height - padding.top - padding.bottom;
-  const maxY = 40;
+  // Calculate maxY dynamically based on the data, with a minimum of 40
+  const maxY = trekActivityData.values.length > 0 
+    ? Math.max(40, Math.max(...trekActivityData.values, 0) + 5) 
+    : 40;
   const capacity = 30;
 
-  const xAt = (i) => padding.left + (i * innerW) / (values.length - 1);
+  const xAt = (i) => padding.left + (i * innerW) / (Math.max(trekActivityData.values.length - 1, 1));
   const yAt = (v) => padding.top + innerH - (v / maxY) * innerH;
 
   // Smooth line using Catmull-Rom to cubic Bezier conversion
@@ -88,7 +100,7 @@ function Dashboard({ onNavigate }) {
     return d.join(' ');
   };
 
-  const points = values.map((v, i) => ({ x: xAt(i), y: yAt(v), v, i }));
+  const points = trekActivityData.values.map((v, i) => ({ x: xAt(i), y: yAt(v), v, i }));
   const pathD = toPath(points);
   const capacityY = yAt(capacity);
 
@@ -119,6 +131,40 @@ function Dashboard({ onNavigate }) {
 
       // Get all bookings
       const allBookings = await getAllBookings();
+      
+      // Filter approved bookings for trek activity chart
+      const approvedBookings = allBookings.filter(booking => {
+        const status = booking.status?.toLowerCase();
+        return status === 'approved' && booking.trekDate;
+      });
+      
+      // Generate trek activity data from approved bookings
+      const activityData = generateTrekActivity(approvedBookings);
+      setTrekActivityData(activityData);
+      
+      // Calculate stats for summary cards
+      if (activityData.values.length > 0) {
+        // Find peak activity
+        const maxValue = Math.max(...activityData.values);
+        const maxIndex = activityData.values.indexOf(maxValue);
+        const peakDate = activityData.days[maxIndex];
+        
+        // Calculate average daily
+        const totalTrekkers = activityData.values.reduce((sum, val) => sum + val, 0);
+        const averageDaily = totalTrekkers / activityData.values.length;
+        
+        // Calculate capacity used percentage (assuming max capacity of 30 per day)
+        const daysWithActivity = activityData.values.filter(v => v > 0).length;
+        const totalCapacity = activityData.values.length * 30;
+        const usedCapacity = activityData.values.reduce((sum, val) => sum + Math.min(val, 30), 0);
+        const capacityUsed = totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
+        
+        setTrekActivityStats({
+          peakActivity: { value: maxValue, date: peakDate },
+          averageDaily: averageDaily.toFixed(1),
+          capacityUsed
+        });
+      }
       
       // Get today's date at midnight for comparison
       const today = new Date();
@@ -236,20 +282,30 @@ function Dashboard({ onNavigate }) {
       // Calculate stats
       const approvedCount = allBookings.filter(b => b.status?.toLowerCase() === 'approved').length;
       const pendingCount = allBookings.filter(b => b.status?.toLowerCase() === 'pending').length;
-      const activeClimbs = allBookings.filter(b => {
-        const status = b.status?.toLowerCase();
-        const trekDate = b.trekDate;
-        if (!trekDate) return false;
-        
-        const trekDateTimestamp = trekDate instanceof Timestamp 
-          ? trekDate 
-          : Timestamp.fromDate(new Date(trekDate));
-        const trekDateOnly = new Date(trekDateTimestamp.toDate());
-        trekDateOnly.setHours(0, 0, 0, 0);
-        
-        return (status === 'approved' || status === 'pending') && 
-               trekDateOnly >= today;
-      }).length;
+      // Calculate active climbs based on number of trekkers scheduled for today and future dates
+      const activeClimbs = allBookings
+        .filter(b => {
+          const status = b.status?.toLowerCase();
+          const trekDate = b.trekDate;
+          if (!trekDate) return false;
+          
+          // Only count approved bookings as active climbs
+          if (status !== 'approved') return false;
+          
+          const trekDateTimestamp = trekDate instanceof Timestamp 
+            ? trekDate 
+            : Timestamp.fromDate(new Date(trekDate));
+          const trekDateOnly = new Date(trekDateTimestamp.toDate());
+          trekDateOnly.setHours(0, 0, 0, 0);
+          
+          return trekDateOnly >= today;
+        })
+        .reduce((total, booking) => {
+          // Count number of trekkers: 1 (the booking user) + numberOfPorters (if porters are considered trekkers)
+          // For now, counting each booking as 1 trekker (the person who booked)
+          // If numberOfPorters represents additional trekkers, add: 1 + (booking.numberOfPorters || 0)
+          return total + 1;
+        }, 0);
 
       // Monthly bookings (current month)
       const currentMonth = new Date().getMonth();
@@ -421,7 +477,7 @@ function Dashboard({ onNavigate }) {
                       Trekk Activity
                     </Typography>
                     <Typography variant="body2" className="trek-activity-subtitle">
-                      Number of Active Trekk over the past 30 days.
+                      Number of Trekkers over the past 30 days.
                     </Typography>
                   </div>
                 </div>
@@ -435,7 +491,7 @@ function Dashboard({ onNavigate }) {
               
               <div className="trek-activity-total">
                 <Typography variant="h2" component="div" className="trek-activity-number">
-                  330
+                  {loading ? '...' : totalActiveTrekkers}
                 </Typography>
                 <Typography variant="body2" className="trek-activity-total-label">
                   total treks
@@ -466,12 +522,12 @@ function Dashboard({ onNavigate }) {
                   })}
                   
                   {/* Vertical grid lines for dates */}
-                  {days.map((d, i) => (i % 2 === 0 ? (
+                  {trekActivityData.days.map((d, i) => (i % 2 === 0 ? (
                     <line key={`vgrid-${i}`} x1={xAt(i)} x2={xAt(i)} y1={padding.top} y2={height - padding.bottom} stroke="#eeeeee" strokeWidth="1" />
                   ) : null))}
 
                   {/* X axis labels every 2 days to match the image */}
-                  {days.map((d, i) => (i % 2 === 0 ? (
+                  {trekActivityData.days.map((d, i) => (i % 2 === 0 ? (
                     <text key={`x-${i}`} x={xAt(i)} y={height - 8} textAnchor="middle" className="axis-text">{d}</text>
                   ) : null))}
 
@@ -480,13 +536,17 @@ function Dashboard({ onNavigate }) {
                   <text x={width - padding.right - 4} y={capacityY - 4} textAnchor="end" className="capacity-label">Maxi</text>
 
                   {/* Area fill */}
-                  <path d={`${pathD} L ${xAt(values.length - 1)} ${height - padding.bottom} L ${xAt(0)} ${height - padding.bottom} Z`} fill="#e8f5e9" />
+                  {trekActivityData.values.length > 0 && (
+                    <path d={`${pathD} L ${xAt(trekActivityData.values.length - 1)} ${height - padding.bottom} L ${xAt(0)} ${height - padding.bottom} Z`} fill="#e8f5e9" />
+                  )}
                   
                   {/* Green line */}
-                  <path d={pathD} fill="none" stroke="#30622f" strokeWidth="2.5" />
+                  {trekActivityData.values.length > 0 && (
+                    <path d={pathD} fill="none" stroke="#30622f" strokeWidth="2.5" />
+                  )}
                   
                   {/* Data points */}
-                  {points.map(p => (
+                  {trekActivityData.values.length > 0 && points.map(p => (
                     <circle
                       key={`pt-${p.i}`}
                       cx={p.x}
@@ -495,7 +555,7 @@ function Dashboard({ onNavigate }) {
                       fill="#30622f"
                       stroke="#ffffff"
                       strokeWidth="2"
-                      onMouseEnter={(e) => setHover({ x: p.x, y: p.y, v: p.v, label: days[p.i], isOverCapacity: p.v > capacity })}
+                      onMouseEnter={(e) => setHover({ x: p.x, y: p.y, v: p.v, label: trekActivityData.days[p.i], isOverCapacity: p.v > capacity })}
                       onMouseLeave={() => setHover(null)}
                     />
                   ))}
@@ -511,7 +571,7 @@ function Dashboard({ onNavigate }) {
                     style={{ left: hover.x, top: hover.y }}
                   >
                     <div className="trek-tooltip-date">{hover.label}</div>
-                    <div className="trek-tooltip-value">{hover.v} trekkers</div>
+                    <div className="trek-tooltip-value">{hover.v} {hover.v === 1 ? 'trekker' : 'trekkers'}</div>
                     {hover.isOverCapacity && (
                       <div className="trek-tooltip-warning">• Above capacity</div>
                     )}
@@ -528,8 +588,8 @@ function Dashboard({ onNavigate }) {
                   </div>
                   <div className="summary-card-content">
                     <div className="summary-card-title">Peak Activity</div>
-                    <div className="summary-card-value">20</div>
-                    <div className="summary-card-date">Sep 29, 2024</div>
+                    <div className="summary-card-value">{loading ? '...' : trekActivityStats.peakActivity.value}</div>
+                    <div className="summary-card-date">{loading ? '...' : trekActivityStats.peakActivity.date || 'N/A'}</div>
                   </div>
                 </div>
                 
@@ -544,7 +604,7 @@ function Dashboard({ onNavigate }) {
                   </div>
                   <div className="summary-card-content">
                     <div className="summary-card-title">Average Daily</div>
-                    <div className="summary-card-value">11.3</div>
+                    <div className="summary-card-value">{loading ? '...' : trekActivityStats.averageDaily}</div>
                     <div className="summary-card-subtitle">trekkers per day</div>
                   </div>
                 </div>
@@ -559,7 +619,7 @@ function Dashboard({ onNavigate }) {
                   </div>
                   <div className="summary-card-content">
                     <div className="summary-card-title">Capacity Used</div>
-                    <div className="summary-card-value">67%</div>
+                    <div className="summary-card-value">{loading ? '...' : `${trekActivityStats.capacityUsed}%`}</div>
                     <div className="summary-card-subtitle">of maximum capacity</div>
                   </div>
                 </div>

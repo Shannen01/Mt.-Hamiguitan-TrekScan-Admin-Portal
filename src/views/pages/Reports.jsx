@@ -1,9 +1,12 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent, Typography, Box } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import { getAllBookings } from '../../services/bookingService';
+import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
+import { Timestamp } from 'firebase/firestore';
 import '../style/Reports.css';
 
 function Reports() {
@@ -12,8 +15,48 @@ function Reports() {
   const [customEndDate, setCustomEndDate] = useState(dayjs());
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [allBookings, setAllBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Generate sample data based on time filter
+  // Fetch bookings from Firebase
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        setLoading(true);
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+          setLoading(false);
+          return;
+        }
+
+        const bookings = await getAllBookings();
+        setAllBookings(bookings);
+      } catch (error) {
+        console.error('Error fetching bookings:', error);
+        setAllBookings([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const unsubscribe = onAuthStateChange((user) => {
+      if (user) {
+        fetchBookings();
+      } else {
+        setAllBookings([]);
+        setLoading(false);
+      }
+    });
+
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      fetchBookings();
+    }
+
+    return () => unsubscribe();
+  }, []);
+
+  // Generate real data based on time filter and bookings
   const generateTrekkerActivity = useCallback(() => {
     const days = [];
     const values = [];
@@ -49,54 +92,165 @@ function Reports() {
         interval = 'month';
     }
 
-    let current = startDate;
-    while (current.isBefore(endDate) || current.isSame(endDate)) {
+    // Filter bookings within the date range (based on trekDate)
+    const filteredBookings = allBookings.filter(booking => {
+      if (!booking.trekDate) return false;
+      
+      const trekDate = booking.trekDate instanceof Timestamp 
+        ? booking.trekDate.toDate() 
+        : new Date(booking.trekDate);
+      
+      const bookingDate = dayjs(trekDate);
+      return (bookingDate.isAfter(startDate.subtract(1, 'day')) || bookingDate.isSame(startDate, 'day')) 
+        && (bookingDate.isBefore(endDate.add(1, 'day')) || bookingDate.isSame(endDate, 'day'));
+    });
+
+    // Group bookings by period based on interval
+    const bookingsByPeriod = {};
+    
+    filteredBookings.forEach(booking => {
+      if (!booking.trekDate) return;
+      
+      const trekDate = booking.trekDate instanceof Timestamp 
+        ? booking.trekDate.toDate() 
+        : new Date(booking.trekDate);
+      
+      let periodKey;
       if (interval === 'day') {
-        days.push(current.format('MMM D'));
+        periodKey = dayjs(trekDate).format('YYYY-MM-DD');
       } else if (interval === 'week') {
-        days.push(`Week ${current.week()}`);
+        const weekStart = dayjs(trekDate).startOf('week');
+        periodKey = `${weekStart.year()}-W${weekStart.week()}`;
       } else {
-        days.push(current.format('MMM YYYY'));
+        periodKey = dayjs(trekDate).format('YYYY-MM');
       }
       
-      // Generate random but realistic values
-      const baseValue = interval === 'day' ? 15 : interval === 'week' ? 100 : 400;
-      const variation = Math.random() * 0.4 - 0.2; // ±20% variation
-      values.push(Math.round(baseValue * (1 + variation)));
+      if (!bookingsByPeriod[periodKey]) {
+        bookingsByPeriod[periodKey] = [];
+      }
+      bookingsByPeriod[periodKey].push(booking);
+    });
+
+    // Generate data points for each period
+    let current = startDate;
+    while (current.isBefore(endDate) || current.isSame(endDate, 'day')) {
+      let periodKey;
+      let label;
+      
+      if (interval === 'day') {
+        periodKey = current.format('YYYY-MM-DD');
+        label = current.format('MMM D');
+      } else if (interval === 'week') {
+        const weekStart = current.startOf('week');
+        periodKey = `${weekStart.year()}-W${weekStart.week()}`;
+        label = `Week ${current.week()}`;
+      } else {
+        periodKey = current.format('YYYY-MM');
+        label = current.format('MMM YYYY');
+      }
+      
+      days.push(label);
+      
+      // Count approved trekkers for this period
+      const periodBookings = bookingsByPeriod[periodKey] || [];
+      const approvedCount = periodBookings.filter(b => b.status?.toLowerCase() === 'approved').length;
+      values.push(approvedCount);
       
       current = current.add(1, interval);
     }
 
     return { days, values };
-  }, [timeFilter, customStartDate, customEndDate]);
+  }, [timeFilter, customStartDate, customEndDate, allBookings]);
 
   const { days, values } = generateTrekkerActivity();
 
-  // Calculate metrics
+  // Calculate metrics from real booking data
   const metrics = useMemo(() => {
-    const totalTrekkers = values.reduce((sum, val) => sum + val, 0);
-    const dailyTrekkers = timeFilter === 'daily' ? values[values.length - 1] : 
+    // Get date range for filtering
+    let startDate, endDate;
+    switch (timeFilter) {
+      case 'daily':
+        startDate = dayjs().subtract(6, 'day');
+        endDate = dayjs();
+        break;
+      case 'weekly':
+        startDate = dayjs().subtract(6, 'week');
+        endDate = dayjs();
+        break;
+      case 'monthly':
+        startDate = dayjs().subtract(11, 'month');
+        endDate = dayjs();
+        break;
+      case 'custom':
+        startDate = customStartDate;
+        endDate = customEndDate;
+        break;
+      default:
+        startDate = dayjs().subtract(11, 'month');
+        endDate = dayjs();
+    }
+
+    // Filter bookings within date range (based on createdAt)
+    const filteredBookings = allBookings.filter(booking => {
+      if (!booking.createdAt) return false;
+      const createdAt = booking.createdAt instanceof Timestamp 
+        ? booking.createdAt.toDate() 
+        : new Date(booking.createdAt);
+      const bookingDate = dayjs(createdAt);
+      return (bookingDate.isAfter(startDate.subtract(1, 'day')) || bookingDate.isSame(startDate, 'day'))
+        && (bookingDate.isBefore(endDate.add(1, 'day')) || bookingDate.isSame(endDate, 'day'));
+    });
+
+    // Calculate metrics
+    const totalBookings = filteredBookings.length;
+    const approvedBookings = filteredBookings.filter(b => b.status?.toLowerCase() === 'approved');
+    const cancelledBookings = filteredBookings.filter(b => b.status?.toLowerCase() === 'cancelled' || b.status?.toLowerCase() === 'rejected');
+    const totalTrekkers = approvedBookings.length;
+    const totalCancellations = cancelledBookings.length;
+
+    // Calculate daily trekkers (average or latest based on filter)
+    const dailyTrekkers = timeFilter === 'daily' ? values[values.length - 1] || 0 : 
                          timeFilter === 'weekly' ? Math.round(totalTrekkers / 7) :
                          timeFilter === 'monthly' ? Math.round(totalTrekkers / 30) : 
-                         values[values.length - 1];
-    const totalBookings = Math.round(totalTrekkers * 1.1); // Assume 10% more bookings than trekkers
-    const totalCancellations = Math.round(totalBookings * 0.08); // 8% cancellation rate
+                         values[values.length - 1] || 0;
+    
     const dailyCapacity = 30;
-    const capacityUsed = Math.round((dailyTrekkers / dailyCapacity) * 100);
+    const capacityUsed = dailyTrekkers > 0 ? Math.round((dailyTrekkers / dailyCapacity) * 100) : 0;
 
-    // Calculate average group size
-    const avgGroupSize = (totalBookings > 0) ? (totalTrekkers / totalBookings).toFixed(1) : '0';
+    // Calculate average group size (assuming 1 trekker per booking for now)
+    const avgGroupSize = totalBookings > 0 ? (totalTrekkers / totalBookings).toFixed(1) : '0';
 
     // Find peak activity
-    const maxValue = Math.max(...values);
+    const maxValue = values.length > 0 ? Math.max(...values, 0) : 0;
     const maxIndex = values.indexOf(maxValue);
-    const peakLabel = days[maxIndex];
+    const peakLabel = maxIndex >= 0 && days[maxIndex] ? days[maxIndex] : 'N/A';
 
-    // Calculate most popular day
-    const dayCounts = {};
-    // Sample data for popular days
-    const popularDays = ['Saturday', 'Sunday', 'Tuesday'];
-    const mostPopularDay = popularDays[Math.floor(Math.random() * popularDays.length)];
+    // Calculate most popular day of week from actual bookings
+    const dayCounts = {
+      'Monday': 0,
+      'Tuesday': 0,
+      'Wednesday': 0,
+      'Thursday': 0,
+      'Friday': 0,
+      'Saturday': 0,
+      'Sunday': 0
+    };
+
+    approvedBookings.forEach(booking => {
+      if (booking.trekDate) {
+        const trekDate = booking.trekDate instanceof Timestamp 
+          ? booking.trekDate.toDate() 
+          : new Date(booking.trekDate);
+        const dayName = dayjs(trekDate).format('dddd');
+        if (dayCounts[dayName] !== undefined) {
+          dayCounts[dayName]++;
+        }
+      }
+    });
+
+    const mostPopularDay = Object.entries(dayCounts).reduce((a, b) => 
+      dayCounts[a[0]] > dayCounts[b[0]] ? a : b
+    )[0] || 'N/A';
 
     return {
       totalTrekkers,
@@ -107,9 +261,10 @@ function Reports() {
       avgGroupSize,
       peakValue: maxValue,
       peakLabel,
-      mostPopularDay
+      mostPopularDay,
+      dayCounts
     };
-  }, [values, days, timeFilter]);
+  }, [values, days, timeFilter, customStartDate, customEndDate, allBookings]);
 
   // Chart dimensions for Trekker Activity Trend
   const chartWidth = 900;
@@ -117,7 +272,8 @@ function Reports() {
   const padding = { top: 30, right: 24, bottom: 40, left: 44 };
   const innerW = chartWidth - padding.left - padding.right;
   const innerH = chartHeight - padding.top - padding.bottom;
-  const maxY = 40; // Fixed maximum of 40
+  // Calculate maxY dynamically based on data, with minimum of 10
+  const maxY = values.length > 0 ? Math.max(40, Math.max(...values, 0) + 5) : 40;
 
   const xAt = (i) => padding.left + (i * innerW) / (values.length - 1 || 1);
   const yAt = (v) => padding.top + innerH - (v / maxY) * innerH;
@@ -147,12 +303,123 @@ function Reports() {
   const [hover, setHover] = useState(null);
   const [barHover, setBarHover] = useState(null);
 
-  // Booking vs Cancellation data
+  // Booking vs Cancellation data from real bookings
   const bookingData = useMemo(() => {
-    const bookingValues = values.map(v => Math.round(v * 1.1));
-    const cancellationValues = bookingValues.map(v => Math.round(v * 0.08));
+    let startDate, endDate, interval;
+
+    switch (timeFilter) {
+      case 'daily':
+        startDate = dayjs().subtract(6, 'day');
+        endDate = dayjs();
+        interval = 'day';
+        break;
+      case 'weekly':
+        startDate = dayjs().subtract(6, 'week');
+        endDate = dayjs();
+        interval = 'week';
+        break;
+      case 'monthly':
+        startDate = dayjs().subtract(11, 'month');
+        endDate = dayjs();
+        interval = 'month';
+        break;
+      case 'custom':
+        startDate = customStartDate;
+        endDate = customEndDate;
+        interval = 'day';
+        break;
+      default:
+        startDate = dayjs().subtract(11, 'month');
+        endDate = dayjs();
+        interval = 'month';
+    }
+
+    // Group bookings by period
+    const bookingsByPeriod = {};
+    const cancellationsByPeriod = {};
+
+    allBookings.forEach(booking => {
+      if (!booking.createdAt) return;
+      
+      const createdAt = booking.createdAt instanceof Timestamp 
+        ? booking.createdAt.toDate() 
+        : new Date(booking.createdAt);
+      
+      const bookingDate = dayjs(createdAt);
+      if (!((bookingDate.isAfter(startDate.subtract(1, 'day')) || bookingDate.isSame(startDate, 'day'))
+        && (bookingDate.isBefore(endDate.add(1, 'day')) || bookingDate.isSame(endDate, 'day')))) {
+        return;
+      }
+
+      let periodKey;
+      if (interval === 'day') {
+        periodKey = bookingDate.format('YYYY-MM-DD');
+      } else if (interval === 'week') {
+        const weekStart = bookingDate.startOf('week');
+        periodKey = `${weekStart.year()}-W${weekStart.week()}`;
+      } else {
+        periodKey = bookingDate.format('YYYY-MM');
+      }
+
+      if (!bookingsByPeriod[periodKey]) {
+        bookingsByPeriod[periodKey] = 0;
+        cancellationsByPeriod[periodKey] = 0;
+      }
+
+      bookingsByPeriod[periodKey]++;
+      
+      if (booking.status?.toLowerCase() === 'cancelled' || booking.status?.toLowerCase() === 'rejected') {
+        cancellationsByPeriod[periodKey]++;
+      }
+    });
+
+    // Map to same periods as days array
+    const bookingValues = days.map((_, index) => {
+      let periodKey;
+      let current = startDate;
+      let currentIndex = 0;
+      
+      while (currentIndex < index) {
+        current = current.add(1, interval);
+        currentIndex++;
+      }
+      
+      if (interval === 'day') {
+        periodKey = current.format('YYYY-MM-DD');
+      } else if (interval === 'week') {
+        const weekStart = current.startOf('week');
+        periodKey = `${weekStart.year()}-W${weekStart.week()}`;
+      } else {
+        periodKey = current.format('YYYY-MM');
+      }
+      
+      return bookingsByPeriod[periodKey] || 0;
+    });
+
+    const cancellationValues = days.map((_, index) => {
+      let periodKey;
+      let current = startDate;
+      let currentIndex = 0;
+      
+      while (currentIndex < index) {
+        current = current.add(1, interval);
+        currentIndex++;
+      }
+      
+      if (interval === 'day') {
+        periodKey = current.format('YYYY-MM-DD');
+      } else if (interval === 'week') {
+        const weekStart = current.startOf('week');
+        periodKey = `${weekStart.year()}-W${weekStart.week()}`;
+      } else {
+        periodKey = current.format('YYYY-MM');
+      }
+      
+      return cancellationsByPeriod[periodKey] || 0;
+    });
+
     return { bookingValues, cancellationValues };
-  }, [values]);
+  }, [timeFilter, customStartDate, customEndDate, allBookings, days]);
 
   // Bar chart dimensions and calculations - memoized for performance
   const barChartConfig = useMemo(() => {
@@ -396,7 +663,7 @@ function Reports() {
               </svg>
             </div>
             <div className="metric-card-content">
-              <div className="metric-card-value">{metrics.totalTrekkers.toLocaleString()}</div>
+              <div className="metric-card-value">{loading ? '...' : metrics.totalTrekkers.toLocaleString()}</div>
               <div className="metric-card-label">Total Trekkers</div>
             </div>
           </div>
@@ -409,7 +676,7 @@ function Reports() {
               </svg>
             </div>
             <div className="metric-card-content">
-              <div className="metric-card-value">{metrics.totalBookings.toLocaleString()}</div>
+              <div className="metric-card-value">{loading ? '...' : metrics.totalBookings.toLocaleString()}</div>
               <div className="metric-card-label">Total Bookings</div>
             </div>
           </div>
@@ -422,7 +689,7 @@ function Reports() {
               </svg>
             </div>
             <div className="metric-card-content">
-              <div className="metric-card-value">{metrics.totalCancellations.toLocaleString()}</div>
+              <div className="metric-card-value">{loading ? '...' : metrics.totalCancellations.toLocaleString()}</div>
               <div className="metric-card-label">Total Cancellations</div>
             </div>
           </div>
@@ -436,7 +703,7 @@ function Reports() {
               </svg>
             </div>
             <div className="metric-card-content">
-              <div className="metric-card-value">{metrics.capacityUsed}%</div>
+              <div className="metric-card-value">{loading ? '...' : `${metrics.capacityUsed}%`}</div>
               <div className="metric-card-label">Capacity Used</div>
             </div>
           </div>
@@ -750,9 +1017,9 @@ function Reports() {
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
                     const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
                     const fullDayName = dayNames[index];
-                    const isPopular = metrics.mostPopularDay.toLowerCase().includes(day.toLowerCase()) || 
-                                     metrics.mostPopularDay.toLowerCase().includes(fullDayName.toLowerCase());
-                    const height = isPopular ? 100 : (index % 3 === 0 ? 60 : index % 3 === 1 ? 40 : 30);
+                    const dayCount = metrics.dayCounts?.[fullDayName] || 0;
+                    const maxCount = Math.max(...Object.values(metrics.dayCounts || {}), 1);
+                    const height = maxCount > 0 ? (dayCount / maxCount) * 100 : 0;
                     
                     // Progressive color gradient from light to vibrant green
                     const colors = [

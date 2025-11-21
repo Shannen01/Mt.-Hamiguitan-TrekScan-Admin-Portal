@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import '../views/style/Dashboard.css';
 import logoImage from '../assets/TrekScan.png';
 import { Home } from 'lucide-react';
 import { Button, IconButton, Menu, MenuItem, ListItemIcon, Tooltip } from '@mui/material';
-import { Event, InsertChart, AccountCircle, Settings as SettingsIcon, Logout as LogoutIcon, Notifications as NotificationsIcon, DarkMode as DarkModeIcon, Hiking, Person, Lock, Close, Visibility, VisibilityOff } from '@mui/icons-material';
+import { Event, InsertChart, AccountCircle, Settings as SettingsIcon, Logout as LogoutIcon, Notifications as NotificationsIcon, DarkMode as DarkModeIcon, Hiking, Person, Lock, Close, Visibility, VisibilityOff, CalendarToday, CheckCircleOutline, Warning, PersonAdd, Delete, Search, CheckCircle, HighlightOff } from '@mui/icons-material';
+import { getAllBookings } from '../services/bookingService';
+import { getUserById } from '../services/userService';
+import { getCurrentUser, onAuthStateChange } from '../services/firebaseAuthService';
+import { Timestamp } from 'firebase/firestore';
 
 import Dashboard from '../views/pages/Dashboard.jsx';
 import ClimbRequest from '../views/pages/ClimbRequest.jsx';
@@ -22,7 +26,13 @@ function AppLayout({ onLogout }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [allBookings, setAllBookings] = useState([]);
+  const [readNotificationIds, setReadNotificationIds] = useState(new Set());
+  const [notificationFilter, setNotificationFilter] = useState('all'); // 'all', 'unread', 'read'
+  const [notificationSearch, setNotificationSearch] = useState('');
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const notificationRef = useRef(null);
+  const actionsMenuRef = useRef(null);
   const [profileData, setProfileData] = useState({
     firstName: 'Administrator',
     lastName: '',
@@ -43,6 +53,268 @@ function AppLayout({ onLogout }) {
       main.scrollTo({ top: 0, behavior: 'auto' });
     }
   }, [activeItem]);
+
+  // Fetch bookings for notifications
+  useEffect(() => {
+    let intervalId = null;
+
+    const fetchBookings = async () => {
+      try {
+        const currentUser = getCurrentUser();
+        if (!currentUser) return;
+
+        const bookings = await getAllBookings();
+        setAllBookings(bookings);
+      } catch (error) {
+        console.error('Error fetching bookings for notifications:', error);
+      }
+    };
+
+    const unsubscribe = onAuthStateChange((user) => {
+      if (user) {
+        fetchBookings();
+        // Set up interval to check for new bookings every 30 seconds
+        intervalId = setInterval(fetchBookings, 30000);
+      } else {
+        setAllBookings([]);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      }
+    });
+
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      fetchBookings();
+      intervalId = setInterval(fetchBookings, 30000);
+    }
+
+    return () => {
+      unsubscribe();
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, []);
+
+  // Generate notifications from bookings
+  const [notificationsList, setNotificationsList] = useState([]);
+  
+  useEffect(() => {
+    const generateNotifications = async () => {
+      const notifs = [];
+      
+      for (const booking of allBookings) {
+        if (!booking.createdAt) continue;
+        
+        const createdAt = booking.createdAt instanceof Timestamp 
+          ? booking.createdAt.toDate() 
+          : new Date(booking.createdAt);
+        
+        // Fetch user data
+        let user = null;
+        if (booking.userId) {
+          try {
+            user = await getUserById(booking.userId);
+          } catch (error) {
+            console.error('Error fetching user:', error);
+          }
+        }
+        
+        const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User';
+        const trekDate = booking.trekDate instanceof Timestamp 
+          ? booking.trekDate.toDate() 
+          : new Date(booking.trekDate);
+        const formattedDate = trekDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        
+        // Calculate time ago
+        const now = new Date();
+        const timeDiff = now - createdAt;
+        const minutesAgo = Math.floor(timeDiff / 60000);
+        const hoursAgo = Math.floor(timeDiff / 3600000);
+        
+        let timeAgo = '';
+        if (minutesAgo < 1) {
+          timeAgo = 'Just now';
+        } else if (minutesAgo < 60) {
+          timeAgo = `${minutesAgo} minute${minutesAgo > 1 ? 's' : ''} ago`;
+        } else if (hoursAgo < 24) {
+          timeAgo = `${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago`;
+        } else {
+          const daysAgo = Math.floor(hoursAgo / 24);
+          timeAgo = `${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+        }
+        
+        const status = booking.status?.toLowerCase();
+        
+        // New booking request notification (pending status)
+        // Only show for new bookings, not for admin actions
+        if (status === 'pending') {
+          notifs.push({
+            id: `booking-${booking.id}`,
+            type: 'booking',
+            icon: 'calendar',
+            iconColor: '#3b82f6',
+            title: 'New Booking Request',
+            description: `${userName} has requested to book Mt. Hamiguitan for ${formattedDate}`,
+            timeAgo: timeAgo,
+            timestamp: createdAt,
+            isRead: readNotificationIds.has(`booking-${booking.id}`),
+            bookingId: booking.id
+          });
+        }
+        
+        // Booking cancellation notification
+        if (status === 'cancelled' && booking.updatedAt) {
+          const updatedAt = booking.updatedAt instanceof Timestamp 
+            ? booking.updatedAt.toDate() 
+            : new Date(booking.updatedAt);
+          const updateTimeDiff = now - updatedAt;
+          
+          // Only show cancellations from the last 7 days
+          if (updateTimeDiff < 7 * 24 * 60 * 60 * 1000) {
+            const updateMinutesAgo = Math.floor(updateTimeDiff / 60000);
+            const updateHoursAgo = Math.floor(updateTimeDiff / 3600000);
+            let updateTimeAgo = '';
+            if (updateMinutesAgo < 1) {
+              updateTimeAgo = 'Just now';
+            } else if (updateMinutesAgo < 60) {
+              updateTimeAgo = `${updateMinutesAgo} minute${updateMinutesAgo > 1 ? 's' : ''} ago`;
+            } else if (updateHoursAgo < 24) {
+              updateTimeAgo = `${updateHoursAgo} hour${updateHoursAgo > 1 ? 's' : ''} ago`;
+            } else {
+              const daysAgo = Math.floor(updateHoursAgo / 24);
+              updateTimeAgo = `${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+            }
+            
+            const shortDate = trekDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            
+            notifs.push({
+              id: `cancelled-${booking.id}`,
+              type: 'cancelled',
+              icon: 'circle',
+              iconColor: '#f59e0b',
+              title: 'Booking Cancelled',
+              description: `${userName}'s booking for Mt. Hamiguitan on ${shortDate} has been cancelled`,
+              timeAgo: updateTimeAgo,
+              timestamp: updatedAt,
+              isRead: readNotificationIds.has(`cancelled-${booking.id}`),
+              bookingId: booking.id
+            });
+          }
+        }
+        
+        // Booking update notifications for rejected and pending status
+        // Only show if booking was updated after creation (indicating a status change or update)
+        if ((status === 'rejected' || status === 'pending') && booking.updatedAt) {
+          const updatedAt = booking.updatedAt instanceof Timestamp 
+            ? booking.updatedAt.toDate() 
+            : new Date(booking.updatedAt);
+          const updateTimeDiff = now - updatedAt;
+          
+          // Only show updates from the last 7 days
+          // And only if updatedAt is significantly different from createdAt (at least 1 minute difference)
+          // This ensures we only show actual updates, not initial creation
+          const createdAtTime = createdAt.getTime();
+          const updatedAtTime = updatedAt.getTime();
+          const timeDifference = updatedAtTime - createdAtTime;
+          
+          if (updateTimeDiff < 7 * 24 * 60 * 60 * 1000 && timeDifference > 60000) {
+            const updateMinutesAgo = Math.floor(updateTimeDiff / 60000);
+            const updateHoursAgo = Math.floor(updateTimeDiff / 3600000);
+            let updateTimeAgo = '';
+            if (updateMinutesAgo < 1) {
+              updateTimeAgo = 'Just now';
+            } else if (updateMinutesAgo < 60) {
+              updateTimeAgo = `${updateMinutesAgo} minute${updateMinutesAgo > 1 ? 's' : ''} ago`;
+            } else if (updateHoursAgo < 24) {
+              updateTimeAgo = `${updateHoursAgo} hour${updateHoursAgo > 1 ? 's' : ''} ago`;
+            } else {
+              const daysAgo = Math.floor(updateHoursAgo / 24);
+              updateTimeAgo = `${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+            }
+            
+            const statusText = status === 'rejected' ? 'rejected' : 'updated';
+            const shortDate = trekDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            
+            notifs.push({
+              id: `update-${booking.id}`,
+              type: 'update',
+              icon: status === 'rejected' ? 'warning' : 'calendar',
+              iconColor: status === 'rejected' ? '#ef4444' : '#3b82f6',
+              title: status === 'rejected' ? 'Booking Rejected' : 'Booking Updated',
+              description: `${userName}'s booking for Mt. Hamiguitan on ${shortDate} has been ${statusText}`,
+              timeAgo: updateTimeAgo,
+              timestamp: updatedAt,
+              isRead: readNotificationIds.has(`update-${booking.id}`),
+              bookingId: booking.id
+            });
+          }
+        }
+      }
+      
+      // Sort by timestamp (newest first)
+      setNotificationsList(notifs.sort((a, b) => {
+        const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+        const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+        return timeB - timeA;
+      }));
+    };
+    
+    if (allBookings.length > 0) {
+      generateNotifications();
+    } else {
+      setNotificationsList([]);
+    }
+  }, [allBookings, readNotificationIds]);
+
+  // Filter and search notifications
+  const filteredNotifications = useMemo(() => {
+    let filtered = [...notificationsList];
+    
+    // Apply status filter
+    if (notificationFilter === 'unread') {
+      filtered = filtered.filter(n => !n.isRead);
+    } else if (notificationFilter === 'read') {
+      filtered = filtered.filter(n => n.isRead);
+    }
+    
+    // Apply search
+    if (notificationSearch.trim()) {
+      const searchTerm = notificationSearch.trim().toLowerCase();
+      filtered = filtered.filter(n => 
+        n.title.toLowerCase().includes(searchTerm) || 
+        n.description.toLowerCase().includes(searchTerm)
+      );
+    }
+    
+    return filtered;
+  }, [notificationsList, notificationFilter, notificationSearch]);
+
+  const unreadCount = notificationsList.filter(n => !n.isRead).length;
+  const readCount = notificationsList.filter(n => n.isRead).length;
+
+  // Mark notification as read
+  const markAsRead = (notificationId) => {
+    setReadNotificationIds(prev => new Set([...prev, notificationId]));
+  };
+
+  // Mark all as read
+  const markAllAsRead = () => {
+    const allIds = notificationsList.map(n => n.id);
+    setReadNotificationIds(prev => new Set([...prev, ...allIds]));
+  };
+
+  // Delete notification
+  const deleteNotification = (notificationId) => {
+    setNotificationsList(prev => prev.filter(n => n.id !== notificationId));
+  };
+
+  // Clear all notifications
+  const clearAllNotifications = () => {
+    setNotificationsList([]);
+    setReadNotificationIds(new Set());
+  };
 
   // Handle image upload
   const handleImageChange = (e) => {
@@ -68,6 +340,9 @@ function AppLayout({ onLogout }) {
       if (notificationRef.current && !notificationRef.current.contains(e.target)) {
         setShowNotifications(false);
       }
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target)) {
+        setShowActionsMenu(false);
+      }
     }
     function handleKey(e) {
       if (e.key === 'Escape') {
@@ -75,6 +350,7 @@ function AppLayout({ onLogout }) {
         setOpenModal(null);
         setShowProfileMenu(false);
         setShowNotifications(false);
+        setShowActionsMenu(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -162,7 +438,7 @@ function AppLayout({ onLogout }) {
                   onClick={() => setShowNotifications(!showNotifications)}
                 >
                   <NotificationsIcon sx={{ fontSize: 24, color: '#6b7280' }} />
-                  <span className="notification-badge-dot"></span>
+                  {unreadCount > 0 && <span className="notification-badge-dot"></span>}
                 </button>
                 
                 {/* Notification Panel */}
@@ -170,40 +446,169 @@ function AppLayout({ onLogout }) {
                   <>
                     <div className="notification-backdrop" onClick={() => setShowNotifications(false)}></div>
                     <div className="notification-panel">
-                      <div className="notification-panel-header">
-                        <h3>Notifications</h3>
-                        <div className="notification-header-actions">
+                      {/* Green Header */}
+                      <div className="notification-panel-header-green">
+                        <div className="notification-header-left">
+                          <NotificationsIcon sx={{ fontSize: 24, color: '#ffffff' }} />
+                          <h3 className="notification-header-title">Notifications</h3>
+                          {unreadCount > 0 && (
+                            <span className="notification-new-badge">{unreadCount} new</span>
+                          )}
+                        </div>
+                        <button 
+                          className="notification-close-btn-header"
+                          onClick={() => setShowNotifications(false)}
+                          aria-label="Close"
+                        >
+                          <Close sx={{ fontSize: 20, color: '#ffffff' }} />
+                        </button>
+                      </div>
+
+                      {/* Filter Buttons */}
+                      <div className="notification-filters">
+                        <button 
+                          className={`notification-filter-btn ${notificationFilter === 'all' ? 'active' : ''}`}
+                          onClick={() => setNotificationFilter('all')}
+                        >
+                          All ({notificationsList.length})
+                        </button>
+                        <button 
+                          className={`notification-filter-btn ${notificationFilter === 'unread' ? 'active' : ''}`}
+                          onClick={() => setNotificationFilter('unread')}
+                        >
+                          Unread ({unreadCount})
+                        </button>
+                        <button 
+                          className={`notification-filter-btn ${notificationFilter === 'read' ? 'active' : ''}`}
+                          onClick={() => setNotificationFilter('read')}
+                        >
+                          Read ({readCount})
+                        </button>
+                        <div className="notification-actions-menu" ref={actionsMenuRef}>
                           <button 
-                            className="notification-mark-all-read"
-                            onClick={() => {/* Mark all as read */}}
+                            className="notification-actions-menu-btn"
+                            onClick={() => setShowActionsMenu(!showActionsMenu)}
                           >
-                            Mark all as read
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="5" r="1.5" fill="currentColor"/>
+                              <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                              <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
+                            </svg>
                           </button>
-                          <button 
-                            className="notification-close-btn"
-                            onClick={() => setShowNotifications(false)}
-                            aria-label="Close"
-                          >
-                            <Close sx={{ fontSize: 20 }} />
-                          </button>
+                          {showActionsMenu && (
+                            <div className="notification-actions-dropdown">
+                              <button 
+                                className="notification-actions-dropdown-item"
+                                onClick={() => {
+                                  markAllAsRead();
+                                  setShowActionsMenu(false);
+                                }}
+                                disabled={unreadCount === 0}
+                              >
+                                <CheckCircle sx={{ fontSize: 18 }} />
+                                <span>Mark all read</span>
+                              </button>
+                              <button 
+                                className="notification-actions-dropdown-item notification-actions-dropdown-item-delete"
+                                onClick={() => {
+                                  clearAllNotifications();
+                                  setShowActionsMenu(false);
+                                }}
+                                disabled={notificationsList.length === 0}
+                              >
+                                <Delete sx={{ fontSize: 18 }} />
+                                <span>Delete all</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
+
+                      {/* Search Bar */}
+                      <div className="notification-search-container">
+                        <Search sx={{ fontSize: 18, color: '#6b7280' }} />
+                        <input
+                          type="text"
+                          className="notification-search-input"
+                          placeholder="Search notifications..."
+                          value={notificationSearch}
+                          onChange={(e) => setNotificationSearch(e.target.value)}
+                        />
+                      </div>
                       
+                      {/* Notification List */}
                       <div className="notification-panel-content">
-                        <div style={{ 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          height: '100%',
-                          padding: '40px 20px',
-                          textAlign: 'center',
-                          color: '#6b7280'
-                        }}>
-                          <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.3 }}>🔔</div>
-                          <div style={{ fontSize: '16px', fontWeight: 500, marginBottom: '8px', color: '#374151' }}>No notifications</div>
-                          <div style={{ fontSize: '14px' }}>You're all caught up!</div>
-                        </div>
+                        {filteredNotifications.length === 0 ? (
+                          <div className="notification-empty-state">
+                            <div className="notification-empty-icon">🔔</div>
+                            <div className="notification-empty-title">No notifications</div>
+                            <div className="notification-empty-subtitle">You're all caught up!</div>
+                          </div>
+                        ) : (
+                          <div className="notification-list">
+                            {filteredNotifications.map(notification => {
+                              const getIcon = () => {
+                                switch(notification.icon) {
+                                  case 'calendar':
+                                    return <CalendarToday sx={{ fontSize: 20, color: '#ffffff' }} />;
+                                  case 'check':
+                                    return <CheckCircleOutline sx={{ fontSize: 20, color: '#ffffff' }} />;
+                                  case 'warning':
+                                    return <Warning sx={{ fontSize: 20, color: '#ffffff' }} />;
+                                  case 'circle':
+                                    return <HighlightOff sx={{ fontSize: 20, color: '#ffffff' }} />;
+                                  case 'user':
+                                    return <PersonAdd sx={{ fontSize: 20, color: '#ffffff' }} />;
+                                  default:
+                                    return <NotificationsIcon sx={{ fontSize: 20, color: '#ffffff' }} />;
+                                }
+                              };
+
+                              return (
+                                <div 
+                                  key={notification.id} 
+                                  className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
+                                >
+                                  <div className="notification-item-icon" style={{ backgroundColor: notification.iconColor }}>
+                                    {getIcon()}
+                                  </div>
+                                  <div className="notification-item-main">
+                                    <div className="notification-item-content">
+                                      <div className="notification-item-title">{notification.title}</div>
+                                      <div className="notification-item-description">{notification.description}</div>
+                                      <div className="notification-item-time">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ marginRight: '4px' }}>
+                                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                                          <path d="M12 6V12L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                        </svg>
+                                        {notification.timeAgo}
+                                      </div>
+                                    </div>
+                                    <div className="notification-item-actions">
+                                      {!notification.isRead && (
+                                        <button 
+                                          className="notification-mark-read-text-btn"
+                                          onClick={() => markAsRead(notification.id)}
+                                        >
+                                          Mark read
+                                        </button>
+                                      )}
+                                      <button 
+                                        className="notification-delete-text-btn"
+                                        onClick={() => deleteNotification(notification.id)}
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </div>
+                                  {!notification.isRead && (
+                                    <span className="notification-unread-dot-indicator"></span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </>
@@ -215,8 +620,7 @@ function AppLayout({ onLogout }) {
                 <button 
                   className="profile-button"
                   onClick={() => {
-                    setOpenModal('profile');
-                    setShowProfileMenu(false);
+                    setShowProfileMenu(!showProfileMenu);
                   }}
                   aria-label="Profile menu"
                 >
@@ -234,19 +638,6 @@ function AppLayout({ onLogout }) {
                 
                 {showProfileMenu && (
                   <div className="profile-dropdown">
-                    <div className="profile-dropdown-header">
-                      <div className="profile-dropdown-avatar">
-                        {profileImage ? (
-                          <img src={profileImage} alt="Profile" className="profile-dropdown-image" />
-                        ) : (
-                          <AccountCircle sx={{ fontSize: 48, color: '#6b7280' }} />
-                        )}
-                      </div>
-                      <div className="profile-dropdown-info">
-                        <div className="profile-dropdown-name">Administrator</div>
-                      </div>
-                    </div>
-                    <div className="profile-dropdown-divider"></div>
                     <button 
                       className="profile-menu-item"
                       onClick={() => {
@@ -255,7 +646,7 @@ function AppLayout({ onLogout }) {
                       }}
                     >
                       <AccountCircle sx={{ fontSize: 20 }} />
-                      <span>My Profile</span>
+                      <span>Profile</span>
                     </button>
                     <button 
                       className="profile-menu-item profile-menu-item-danger"

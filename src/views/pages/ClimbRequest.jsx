@@ -11,6 +11,7 @@ import {
 import { getUserById } from '../../services/userService';
 import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
 import Attachment from '../../models/Attachment';
+import { Timestamp } from 'firebase/firestore';
 
 function ClimbRequest() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -109,8 +110,8 @@ function ClimbRequest() {
               affiliation: booking.affiliation || 'N/A',
               numberOfPorters: booking.numberOfPorters || 0,
               purposeOfClimb: booking.notes || booking.trekType || 'N/A',
-              requestedDate: formatBookingDate(booking.trekDate, 'short'),
-              dateSubmitted: formatBookingDate(booking.createdAt, 'short'),
+              requestedDate: formatBookingDate(booking.trekDate, 'full'),
+              dateSubmitted: formatBookingDate(booking.createdAt, 'full'),
               status: capitalizeStatus(booking.status),
               documents: booking.attachments || [],
               attachments: booking.attachments || [],
@@ -135,8 +136,8 @@ function ClimbRequest() {
               affiliation: booking.affiliation || 'N/A',
               numberOfPorters: booking.numberOfPorters || 0,
               purposeOfClimb: booking.notes || booking.trekType || 'N/A',
-              requestedDate: formatBookingDate(booking.trekDate, 'short'),
-              dateSubmitted: formatBookingDate(booking.createdAt, 'short'),
+              requestedDate: formatBookingDate(booking.trekDate, 'full'),
+              dateSubmitted: formatBookingDate(booking.createdAt, 'full'),
               status: capitalizeStatus(booking.status),
               documents: booking.attachments || [],
               attachments: booking.attachments || [],
@@ -262,8 +263,8 @@ function ClimbRequest() {
         
         setSelectedRequest({
           ...request,
-          requestedDate: formatBookingDate(booking.trekDate, 'short'),
-          dateSubmitted: formatBookingDate(booking.createdAt, 'short')
+          requestedDate: formatBookingDate(booking.trekDate, 'full'),
+          dateSubmitted: formatBookingDate(booking.createdAt, 'full')
         });
         
         // Populate form with request data
@@ -626,10 +627,10 @@ function ClimbRequest() {
             <table className="requests-table">
               <thead>
                 <tr>
-                  <th>Request ID</th>
                   <th>Name</th>
-                  <th>Requested Date</th>
+                  <th>Affiliation</th>
                   <th>Date Submitted</th>
+                  <th>Requested Date</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -654,10 +655,10 @@ function ClimbRequest() {
                 ) : (
                   filteredRequests.map((request) => (
                     <tr key={request.id}>
-                      <td className="request-id">{request.requestId || request.id}</td>
                       <td>{request.name || 'N/A'}</td>
-                      <td>{request.requestedDate || 'Not specified'}</td>
+                      <td>{request.affiliation || 'N/A'}</td>
                       <td>{request.dateSubmitted || 'Not specified'}</td>
+                      <td>{request.requestedDate || 'Not specified'}</td>
                       <td>
                         <span className={`status-badge ${(request.status || 'Pending').toLowerCase()}`}>
                           {request.status || 'Pending'}
@@ -711,7 +712,7 @@ function ClimbRequest() {
                     <h3>Request Details</h3>
                     <span className="request-id-badge">{selectedRequest.id}</span>
                   </div>
-                  <p className="submission-date">Submitted on {selectedRequest.dateSubmitted ? formatBookingDate(selectedRequest._booking?.createdAt || selectedRequest.dateSubmitted, 'long') : 'Not specified'}</p>
+                  <p className="submission-date">Submitted on {selectedRequest.dateSubmitted ? formatBookingDate(selectedRequest._booking?.createdAt || selectedRequest.dateSubmitted, 'full') : 'Not specified'}</p>
                 </div>
                 <div className="header-right">
                   <span className={`status-badge-modal ${selectedRequest.status.toLowerCase()}`}>
@@ -829,29 +830,77 @@ function ClimbRequest() {
                       <h4>Documents</h4>
                     </div>
                     {uploadedFiles && uploadedFiles.length > 0 ? (
-                      <div className="file-list">
-                        {uploadedFiles.map((file, index) => (
-                          <div key={index} className="file-item" onClick={() => handleFileOpen(file)}>
-                            <div className="file-icon">
-                              {getFileIcon(file.type || file.mimeType || '')}
-                            </div>
-                            <div className="file-info">
-                              <div className="file-name">{file.name || file.fileName || `Document ${index + 1}`}</div>
-                              {file.size && (
-                                <div className="file-size">
-                                  {(file.size / 1024).toFixed(2)} KB
+                      <div className="documents-card-grid">
+                        {uploadedFiles.map((file, index) => {
+                          // Format file size
+                          const fileSize = file.size 
+                            ? file.size > 1024 * 1024 
+                              ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+                              : `${(file.size / 1024).toFixed(2)} KB`
+                            : 'N/A';
+                          
+                          // Get file type
+                          const fileType = file.type || file.mimeType || 'application/pdf';
+                          const isPDF = fileType.includes('pdf');
+                          
+                          // Format date (use createdAt from booking or current date)
+                          const fileDate = selectedRequest?._booking?.createdAt 
+                            ? (() => {
+                                const date = selectedRequest._booking.createdAt instanceof Timestamp 
+                                  ? selectedRequest._booking.createdAt.toDate() 
+                                  : new Date(selectedRequest._booking.createdAt);
+                                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                              })()
+                            : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                          
+                          return (
+                            <div key={index} className="document-card">
+                              <div className="document-card-thumbnail">
+                                {isPDF ? (
+                                  <div className="document-pdf-preview">
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#ef4444" strokeWidth="2"/>
+                                      <polyline points="14,2 14,8 20,8" stroke="#ef4444" strokeWidth="2"/>
+                                      <line x1="16" y1="13" x2="8" y2="13" stroke="#ef4444" strokeWidth="2"/>
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  <div className="document-image-preview">
+                                    <img 
+                                      src={file.downloadURL || file.url || ''} 
+                                      alt={file.name || file.fileName || 'Document'}
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.nextSibling.style.display = 'flex';
+                                      }}
+                                    />
+                                    <div className="document-fallback-icon" style={{ display: 'none' }}>
+                                      {getFileIcon(fileType)}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="document-card-content">
+                                <h5 className="document-card-title">{file.name || file.fileName || `Document ${index + 1}`}</h5>
+                                <div className="document-card-meta">
+                                  <span className="document-card-type">PDF</span>
+                                  <span className="document-card-size">{fileSize}</span>
                                 </div>
-                              )}
+                                <div className="document-card-date">Added {fileDate}</div>
+                              </div>
+                              <button 
+                                className="document-card-view-btn"
+                                onClick={() => handleFileOpen(file)}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                  <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" strokeWidth="2"/>
+                                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                                </svg>
+                                View
+                              </button>
                             </div>
-                            <div className="file-action">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke="currentColor" strokeWidth="2"/>
-                                <polyline points="15,3 21,3 21,9" stroke="currentColor" strokeWidth="2"/>
-                                <line x1="10" y1="14" x2="21" y2="3" stroke="currentColor" strokeWidth="2"/>
-                              </svg>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="file-drop-zone">

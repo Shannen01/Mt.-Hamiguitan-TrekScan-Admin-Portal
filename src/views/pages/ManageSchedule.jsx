@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
@@ -6,308 +6,176 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import FilterListAltIcon from '@mui/icons-material/FilterListAlt';
 import SearchIcon from '@mui/icons-material/Search';
 import EventNoteIcon from '@mui/icons-material/EventNote';
+import { getAllBookings } from '../../services/bookingService';
+import { getUserById } from '../../services/userService';
+import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
+import { Timestamp } from 'firebase/firestore';
 import '../style/ManageSchedule.css';
 
 function ManageSchedule() {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
-  const [currentDate, setCurrentDate] = useState(new Date(2022, 10, 1)); // November 2022
-  const [selectedDay, setSelectedDay] = useState(10);
+  const [currentDate, setCurrentDate] = useState(new Date()); // Current date
+  const [selectedDay, setSelectedDay] = useState(null); // null means show all days, number means specific day
   const [selectedFilter, setSelectedFilter] = useState('all'); // 'all', 'completed', 'approve', 'canceled', 'pending'
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showMonthYearDropdown, setShowMonthYearDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [allBookings, setAllBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const filterRef = useRef(null);
   const monthYearRef = useRef(null);
 
-  const events = [
-    {
-      id: 1,
-      day: 31,
-      month: 'OCT',
-      title: 'Trek Alliance',
-      description: 'Design system update event',
-      location: 'Mt. Hamiguitan',
-      participants: 25,
-      status: 'Active',
-      type: 'Design',
-      color: '#E9D5FF',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 2,
-      day: 2,
-      month: 'NOV',
-      title: 'HighTrail Partners',
-      description: 'Wireframe event',
-      location: 'Mt. Hamiguitan Base Camp',
-      participants: 15,
-      status: 'Upcoming',
-      type: 'Design',
-      color: '#A7F3D0',
-      time: '10:30 - 12:00',
-      price: '₱500'
-    },
-    {
-      id: 3,
-      day: 3,
-      month: 'NOV',
-      title: 'Summit Explorers Network',
-      description: 'Brand guideline event',
-      location: 'Mt. Hamiguitan Trails',
-      participants: 40,
-      status: 'Upcoming',
-      type: 'Brand',
-      color: '#DDD6FE',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 4,
-      day: 4,
-      month: 'NOV',
-      title: 'EcoTrek Alliance',
-      description: 'Brand guideline event',
-      location: 'Mt. Hamiguitan Camp Site',
-      participants: 18,
-      status: 'Upcoming',
-      type: 'Brand',
-      color: '#DDD6FE',
-      time: '10:30 - 12:00',
-      price: '₱1,200'
-    },
-    {
-      id: 5,
-      day: 6,
-      month: 'NOV',
-      title: 'Mountain Path Association',
-      description: 'Website design event',
-      location: 'Mt. Hamiguitan Range',
-      participants: 12,
-      status: 'Upcoming',
-      type: 'Website',
-      color: '#FED7AA',
-      time: '10:30 - 12:00',
-      price: '₱800'
-    },
-    {
-      id: 6,
-      day: 8,
-      month: 'NOV',
-      title: 'Wilderness Trek Council',
-      description: 'Product promotion event',
-      location: 'Mt. Hamiguitan',
-      participants: 20,
-      status: 'Upcoming',
-      type: 'Promotion',
-      color: '#BFDBFE',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 7,
-      day: 10,
-      month: 'NOV',
-      title: 'Mountain Path Association',
-      description: 'Website design event',
-      location: 'Mt. Hamiguitan',
-      participants: 15,
-      status: 'Active',
-      type: 'Website',
-      color: '#FED7AA',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 8,
-      day: 12,
-      month: 'NOV',
-      title: 'TrailGuard Affiliation',
-      description: 'Product promotion event',
-      location: 'Mt. Hamiguitan',
-      participants: 18,
-      status: 'Upcoming',
-      type: 'Promotion',
-      color: '#BFDBFE',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 9,
-      day: 14,
-      month: 'NOV',
-      title: 'Mountain Path Association',
-      description: 'Website design event',
-      location: 'Mt. Hamiguitan',
-      participants: 22,
-      status: 'Upcoming',
-      type: 'Website',
-      color: '#FED7AA',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 10,
-      day: 16,
-      month: 'NOV',
-      title: 'Summit Explorers Network',
-      description: 'Brand guideline event',
-      location: 'Mt. Hamiguitan',
-      participants: 25,
-      status: 'Upcoming',
-      type: 'Brand',
-      color: '#DDD6FE',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 11,
-      day: 18,
-      month: 'NOV',
-      title: 'Mountain Path Association',
-      description: 'Website design event',
-      location: 'Mt. Hamiguitan',
-      participants: 20,
-      status: 'Upcoming',
-      type: 'Website',
-      color: '#FED7AA',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 12,
-      day: 20,
-      month: 'NOV',
-      title: 'HighTrail Partners',
-      description: 'Wireframe event',
-      location: 'Mt. Hamiguitan',
-      participants: 15,
-      status: 'Upcoming',
-      type: 'Design',
-      color: '#A7F3D0',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 13,
-      day: 22,
-      month: 'NOV',
-      title: 'TrailGuard Affiliation',
-      description: 'Product promotion event',
-      location: 'Mt. Hamiguitan',
-      participants: 18,
-      status: 'Upcoming',
-      type: 'Promotion',
-      color: '#BFDBFE',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 14,
-      day: 24,
-      month: 'NOV',
-      title: 'Peak Journey Collective',
-      description: 'Real estate project event',
-      location: 'Mt. Hamiguitan',
-      participants: 30,
-      status: 'Upcoming',
-      type: 'Project',
-      color: '#86EFAC',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 15,
-      day: 26,
-      month: 'NOV',
-      title: 'TrailGuard Affiliation',
-      description: 'Product promotion event',
-      location: 'Mt. Hamiguitan',
-      participants: 20,
-      status: 'Upcoming',
-      type: 'Promotion',
-      color: '#BFDBFE',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 16,
-      day: 28,
-      month: 'NOV',
-      title: 'Summit Explorers Network',
-      description: 'Brand guideline event',
-      location: 'Mt. Hamiguitan',
-      participants: 25,
-      status: 'Upcoming',
-      type: 'Brand',
-      color: '#DDD6FE',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 17,
-      day: 30,
-      month: 'NOV',
-      title: 'HighTrail Partners',
-      description: 'Wireframe event',
-      location: 'Mt. Hamiguitan',
-      participants: 15,
-      status: 'Upcoming',
-      type: 'Design',
-      color: '#A7F3D0',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 18,
-      day: 2,
-      month: 'DEC',
-      title: 'Summit Explorers Network',
-      description: 'Brand guideline event',
-      location: 'Mt. Hamiguitan',
-      participants: 22,
-      status: 'Upcoming',
-      type: 'Brand',
-      color: '#DDD6FE',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    },
-    {
-      id: 19,
-      day: 4,
-      month: 'DEC',
-      title: 'Peak Journey Collective',
-      description: 'Real estate project event',
-      location: 'Mt. Hamiguitan',
-      participants: 28,
-      status: 'Upcoming',
-      type: 'Project',
-      color: '#86EFAC',
-      time: '10:30 - 12:00',
-      price: 'Free'
-    }
-  ];
+  // Fetch bookings from Firebase
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        setLoading(true);
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+          setLoading(false);
+          return;
+        }
 
-  const pastEvents = [
-    {
-      id: 6,
-      day: 2,
-      month: 'AUG',
-      year: 2024,
-      title: 'Introduction to Blockchain Workshop',
-      description: 'Learn the basics of blockchain technology',
-      date: '02 Aug 2024'
-    },
-    {
-      id: 7,
-      day: 15,
-      month: 'AUG',
-      year: 2024,
-      title: 'Introduction to Digital Marketing Workshop',
-      description: 'Master digital marketing strategies',
-      date: '15 Aug 2024'
+        const bookings = await getAllBookings();
+        setAllBookings(bookings);
+      } catch (error) {
+        console.error('Error fetching bookings:', error);
+        setAllBookings([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const unsubscribe = onAuthStateChange((user) => {
+      if (user) {
+        fetchBookings();
+      } else {
+        setAllBookings([]);
+        setLoading(false);
+      }
+    });
+
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      fetchBookings();
     }
-  ];
+
+    return () => unsubscribe();
+  }, []);
+
+  // Convert bookings to events format based on trekDate
+  const convertBookingsToEvents = async (bookings) => {
+    const events = [];
+    
+    for (const booking of bookings) {
+      if (!booking.trekDate) continue;
+      
+      const trekDate = booking.trekDate instanceof Timestamp 
+        ? booking.trekDate.toDate() 
+        : new Date(booking.trekDate);
+      
+      const day = trekDate.getDate();
+      const month = trekDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+      
+      // Fetch user data for affiliation
+      let user = null;
+      if (booking.userId) {
+        try {
+          user = await getUserById(booking.userId);
+        } catch (error) {
+          console.error('Error fetching user:', error);
+        }
+      }
+      
+      // Map status
+      let status = 'Upcoming';
+      if (booking.status?.toLowerCase() === 'approved') {
+        status = 'Active';
+      } else if (booking.status?.toLowerCase() === 'completed') {
+        status = 'Active'; // Treat completed as active for display
+      } else if (booking.status?.toLowerCase() === 'cancelled' || booking.status?.toLowerCase() === 'rejected') {
+        status = 'Cancelled';
+      }
+      
+      events.push({
+        id: booking.id,
+        day: day,
+        month: month,
+        title: booking.affiliation || (user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown'),
+        description: booking.notes || booking.trekType || 'Trek Request',
+        location: 'Mt. Hamiguitan',
+        participants: booking.numberOfPorters || 1, // Using numberOfPorters as participants
+        status: status,
+        type: booking.trekType || 'recreational',
+        color: '#E9D5FF',
+        time: '10:30 - 12:00',
+        price: 'Free',
+        bookingStatus: booking.status?.toLowerCase() || 'pending',
+        trekDate: trekDate
+      });
+    }
+    
+    return events;
+  };
+
+  // Get events for the current month
+  const [events, setEvents] = useState([]);
+  
+  useEffect(() => {
+    const loadEvents = async () => {
+      if (allBookings.length === 0) {
+        setEvents([]);
+        return;
+      }
+      
+      const currentMonth = currentDate.getMonth();
+      const currentYear = currentDate.getFullYear();
+      
+      // Filter bookings by trekDate month/year
+      const monthBookings = allBookings.filter(booking => {
+        if (!booking.trekDate) return false;
+        
+        const trekDate = booking.trekDate instanceof Timestamp 
+          ? booking.trekDate.toDate() 
+          : new Date(booking.trekDate);
+        
+        return trekDate.getMonth() === currentMonth && trekDate.getFullYear() === currentYear;
+      });
+      
+      const convertedEvents = await convertBookingsToEvents(monthBookings);
+      setEvents(convertedEvents);
+    };
+    
+    loadEvents();
+  }, [allBookings, currentDate]);
+
+  // Get past events (bookings with trekDate in the past)
+  const pastEvents = useMemo(() => {
+    const now = new Date();
+    return allBookings
+      .filter(booking => {
+        if (!booking.trekDate) return false;
+        const trekDate = booking.trekDate instanceof Timestamp 
+          ? booking.trekDate.toDate() 
+          : new Date(booking.trekDate);
+        return trekDate < now;
+      })
+      .slice(0, 10) // Limit to 10 most recent
+      .map(booking => {
+        const trekDate = booking.trekDate instanceof Timestamp 
+          ? booking.trekDate.toDate() 
+          : new Date(booking.trekDate);
+        return {
+          id: booking.id,
+          day: trekDate.getDate(),
+          month: trekDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+          year: trekDate.getFullYear(),
+          title: booking.affiliation || 'Trek Request',
+          description: booking.notes || booking.trekType || 'Trek Request',
+          date: trekDate.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
+        };
+      });
+  }, [allBookings]);
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -328,16 +196,34 @@ function ManageSchedule() {
       } else {
         newDate.setMonth(prev.getMonth() + 1);
       }
-      setSelectedDay(1); // Reset selected day when changing months
+      setSelectedDay(null); // Reset selected day when changing months to show all bookings
       return newDate;
     });
   };
 
   const getEventsForDay = (day) => {
-    return events.filter(event => 
-      event.day === day && 
-      event.month === currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
-    );
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    return allBookings.filter(booking => {
+      if (!booking.trekDate) return false;
+      
+      // Exclude cancelled and rejected bookings from calendar
+      const status = booking.status?.toLowerCase();
+      if (status === 'cancelled' || status === 'rejected') {
+        return false;
+      }
+      
+      const trekDate = booking.trekDate instanceof Timestamp 
+        ? booking.trekDate.toDate() 
+        : new Date(booking.trekDate);
+      
+      // Normalize dates to midnight for accurate comparison (avoid timezone issues)
+      const bookingDate = new Date(trekDate.getFullYear(), trekDate.getMonth(), trekDate.getDate());
+      const targetDate = new Date(currentYear, currentMonth, day);
+      
+      return bookingDate.getTime() === targetDate.getTime();
+    });
   };
 
   const formatMonthYear = (date) => {
@@ -345,6 +231,9 @@ function ManageSchedule() {
   };
 
   const formatCurrentDay = (date, day) => {
+    if (day === null) {
+      return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
     const dayDate = new Date(date.getFullYear(), date.getMonth(), day);
     const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'long' });
     const dayNumber = day;
@@ -355,6 +244,9 @@ function ManageSchedule() {
   };
 
   const getDayOfWeek = (date, day) => {
+    if (day === null) {
+      return new Date().getDay(); // Return current day if no day selected
+    }
     const dayDate = new Date(date.getFullYear(), date.getMonth(), day);
     return dayDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
   };
@@ -414,17 +306,24 @@ function ManageSchedule() {
     }
   };
 
-  // Calculate event counts by status
-  const getEventCounts = () => {
-    const eventMonth = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-    const monthEvents = events.filter(e => e.month === eventMonth);
+  // Calculate event counts by status from real bookings
+  const eventCounts = useMemo(() => {
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
     
-    // Map events to status categories
-    // For now, using sample counts - in real app, events would have explicit status
-    const completed = monthEvents.filter(e => e.status === 'Active' || e.id % 3 === 0).length || 12;
-    const pending = monthEvents.filter(e => e.status === 'Upcoming' && e.id % 4 === 0).length || 5;
-    const cancelled = monthEvents.filter(e => e.id % 7 === 0).length || 3;
-    const approved = monthEvents.filter(e => e.status === 'Upcoming' && e.id % 5 === 0).length || 8;
+    // Filter bookings by trekDate month/year
+    const monthBookings = allBookings.filter(booking => {
+      if (!booking.trekDate) return false;
+      const trekDate = booking.trekDate instanceof Timestamp 
+        ? booking.trekDate.toDate() 
+        : new Date(booking.trekDate);
+      return trekDate.getMonth() === currentMonth && trekDate.getFullYear() === currentYear;
+    });
+    
+    const completed = monthBookings.filter(b => b.status?.toLowerCase() === 'completed').length;
+    const pending = monthBookings.filter(b => b.status?.toLowerCase() === 'pending').length;
+    const cancelled = monthBookings.filter(b => b.status?.toLowerCase() === 'cancelled' || b.status?.toLowerCase() === 'rejected').length;
+    const approved = monthBookings.filter(b => b.status?.toLowerCase() === 'approved').length;
     
     return {
       completed: completed,
@@ -432,16 +331,23 @@ function ManageSchedule() {
       cancelled: cancelled,
       approved: approved
     };
-  };
-
-  const eventCounts = getEventCounts();
+  }, [allBookings, currentDate]);
   const totalEvents = eventCounts.completed + eventCounts.pending + eventCounts.cancelled + eventCounts.approved;
   const overallProgress = totalEvents > 0 ? Math.round((eventCounts.completed / totalEvents) * 100) : 0;
 
-  // Calculate slot availability for calendar view
-  const getSlotAvailability = () => {
-    const eventMonth = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-    const monthEvents = events.filter(e => e.month === eventMonth);
+  // Calculate slot availability for calendar view from real bookings
+  const slotAvailability = useMemo(() => {
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    // Filter bookings by trekDate month/year
+    const monthBookings = allBookings.filter(booking => {
+      if (!booking.trekDate) return false;
+      const trekDate = booking.trekDate instanceof Timestamp 
+        ? booking.trekDate.toDate() 
+        : new Date(booking.trekDate);
+      return trekDate.getMonth() === currentMonth && trekDate.getFullYear() === currentYear;
+    });
     
     // Assume max capacity per day is 50 (can be adjusted)
     const MAX_CAPACITY = 50;
@@ -450,17 +356,25 @@ function ManageSchedule() {
     let limited = 0;   // Yellow/Orange - 30-80% booked
     let full = 0;      // Red - 80-100% booked
     
-    // Group events by day
-    const eventsByDay = {};
-    monthEvents.forEach(event => {
-      if (!eventsByDay[event.day]) {
-        eventsByDay[event.day] = 0;
+    // Group bookings by day (only count approved/pending bookings)
+    const bookingsByDay = {};
+    monthBookings.forEach(booking => {
+      const status = booking.status?.toLowerCase();
+      if (status === 'cancelled' || status === 'rejected') return; // Don't count cancelled/rejected
+      
+      const trekDate = booking.trekDate instanceof Timestamp 
+        ? booking.trekDate.toDate() 
+        : new Date(booking.trekDate);
+      const day = trekDate.getDate();
+      
+      if (!bookingsByDay[day]) {
+        bookingsByDay[day] = 0;
       }
-      eventsByDay[event.day] += event.participants || 0;
+      bookingsByDay[day] += (booking.numberOfPorters || 1);
     });
     
     // Count days by availability status
-    Object.values(eventsByDay).forEach(participants => {
+    Object.values(bookingsByDay).forEach(participants => {
       const percentage = (participants / MAX_CAPACITY) * 100;
       if (percentage < 30) {
         available++;
@@ -471,15 +385,13 @@ function ManageSchedule() {
       }
     });
     
-    // Count days with no events as available
+    // Count days with no bookings as available
     const { daysInMonth } = getDaysInMonth(currentDate);
-    const daysWithEvents = Object.keys(eventsByDay).length;
-    available += (daysInMonth - daysWithEvents);
+    const daysWithBookings = Object.keys(bookingsByDay).length;
+    available += (daysInMonth - daysWithBookings);
     
     return { available, limited, full };
-  };
-
-  const slotAvailability = getSlotAvailability();
+  }, [allBookings, currentDate]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -597,6 +509,7 @@ function ManageSchedule() {
                       className={`filter-dropdown-item ${selectedFilter === 'all' ? 'active' : ''}`}
                       onClick={() => {
                         setSelectedFilter('all');
+                        setSelectedDay(null); // Reset day selection when changing filter
                         setShowFilterDropdown(false);
                       }}
                     >
@@ -608,6 +521,7 @@ function ManageSchedule() {
                       data-filter="completed"
                       onClick={() => {
                         setSelectedFilter('completed');
+                        setSelectedDay(null); // Reset day selection when changing filter
                         setShowFilterDropdown(false);
                       }}
                     >
@@ -619,6 +533,7 @@ function ManageSchedule() {
                       data-filter="approve"
                       onClick={() => {
                         setSelectedFilter('approve');
+                        setSelectedDay(null); // Reset day selection when changing filter
                         setShowFilterDropdown(false);
                       }}
                     >
@@ -630,6 +545,7 @@ function ManageSchedule() {
                       data-filter="canceled"
                       onClick={() => {
                         setSelectedFilter('canceled');
+                        setSelectedDay(null); // Reset day selection when changing filter
                         setShowFilterDropdown(false);
                       }}
                     >
@@ -641,6 +557,7 @@ function ManageSchedule() {
                       data-filter="pending"
                       onClick={() => {
                         setSelectedFilter('pending');
+                        setSelectedDay(null); // Reset day selection when changing filter
                         setShowFilterDropdown(false);
                       }}
                     >
@@ -675,7 +592,7 @@ function ManageSchedule() {
               
               <div className="calendar-grid-compact">
                 <div className="calendar-weekdays-compact">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                     <div key={day} className="weekday-compact">{day}</div>
                   ))}
                 </div>
@@ -690,10 +607,11 @@ function ManageSchedule() {
                     const prevMonth = new Date(year, month, 0);
                     const prevMonthDays = prevMonth.getDate();
                     
-                    // Adjust starting day (Monday = 0, Sunday = 6)
-                    const adjustedStart = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
+                    // JavaScript's getDay() returns 0 for Sunday, 1 for Monday, etc.
+                    // Calendar starts on Sunday (0), so no adjustment needed
+                    const adjustedStart = startingDayOfWeek;
                     
-                    // Days from previous month
+                    // Days from previous month (fill in the gap before the first day of current month)
                     for (let i = adjustedStart - 1; i >= 0; i--) {
                       const day = prevMonthDays - i;
                       days.push(
@@ -706,22 +624,34 @@ function ManageSchedule() {
                     // Days of the current month
                     for (let day = 1; day <= daysInMonth; day++) {
                       const dayEvents = getEventsForDay(day);
-                      const hasEvents = dayEvents.length > 0;
-                      const isSelected = day === selectedDay && currentDate.getMonth() === month;
+                      const bookingCount = dayEvents.length;
+                      const hasEvents = bookingCount > 0;
+                      const isSelected = day === selectedDay;
                       
                       days.push(
                         <div 
                           key={day} 
                           className={`calendar-day-compact ${isSelected ? 'selected' : ''} ${hasEvents ? 'has-events' : ''}`}
-                          onClick={() => setSelectedDay(day)}
+                          onClick={() => {
+                            // Toggle: if same day is clicked, deselect it (show all)
+                            if (selectedDay === day) {
+                              setSelectedDay(null);
+                            } else {
+                              setSelectedDay(day);
+                            }
+                          }}
                         >
                           <div className="day-number-compact">{day}</div>
-                          {hasEvents && <div className="event-dot"></div>}
+                          {hasEvents && (
+                            <div className="booking-count-badge-compact">
+                              {bookingCount}
+                            </div>
+                          )}
                         </div>
                       );
                     }
                     
-                    // Fill remaining cells with next month's days
+                    // Fill remaining cells with next month's days to complete the grid (always 7 columns)
                     const totalCells = days.length;
                     const cellsInGrid = Math.ceil(totalCells / 7) * 7;
                     const remainingCells = cellsInGrid - totalCells;
@@ -764,7 +694,10 @@ function ManageSchedule() {
                 <div className="category-status-left">
                   <button 
                     className={`category-status-card completed ${selectedFilter === 'completed' ? 'active' : ''}`}
-                    onClick={() => setSelectedFilter('completed')}
+                    onClick={() => {
+                      setSelectedFilter('completed');
+                      setSelectedDay(null); // Reset day selection when changing filter
+                    }}
                   >
                     <div className="category-status-icon" style={{ backgroundColor: '#10b981' }}>
                       <CheckCircleIcon style={{ color: '#ffffff', fontSize: '20px' }} />
@@ -778,7 +711,10 @@ function ManageSchedule() {
                   
                   <button 
                     className={`category-status-card canceled ${selectedFilter === 'canceled' ? 'active' : ''}`}
-                    onClick={() => setSelectedFilter('canceled')}
+                    onClick={() => {
+                      setSelectedFilter('canceled');
+                      setSelectedDay(null); // Reset day selection when changing filter
+                    }}
                   >
                     <div className="category-status-icon" style={{ backgroundColor: '#ef4444' }}>
                       <HighlightOffIcon style={{ color: '#ffffff', fontSize: '20px' }} />
@@ -794,7 +730,10 @@ function ManageSchedule() {
                 <div className="category-status-right">
                   <button 
                     className={`category-status-card pending ${selectedFilter === 'pending' ? 'active' : ''}`}
-                    onClick={() => setSelectedFilter('pending')}
+                    onClick={() => {
+                      setSelectedFilter('pending');
+                      setSelectedDay(null); // Reset day selection when changing filter
+                    }}
                   >
                     <div className="category-status-icon" style={{ backgroundColor: '#f59e0b' }}>
                       <AccessTimeIcon style={{ color: '#ffffff', fontSize: '20px' }} />
@@ -808,7 +747,10 @@ function ManageSchedule() {
                   
                   <button 
                     className={`category-status-card approve ${selectedFilter === 'approve' ? 'active' : ''}`}
-                    onClick={() => setSelectedFilter('approve')}
+                    onClick={() => {
+                      setSelectedFilter('approve');
+                      setSelectedDay(null); // Reset day selection when changing filter
+                    }}
                   >
                     <div className="category-status-icon" style={{ backgroundColor: '#3b82f6' }}>
                       <TaskAltIcon style={{ color: '#ffffff', fontSize: '20px' }} />
@@ -896,47 +838,111 @@ function ManageSchedule() {
             
             <div className="upcoming-events-list">
               {(() => {
-                const eventMonth = currentDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-                const filteredEvents = events
-                  .filter(e => {
-                    const matchesMonth = e.month === eventMonth;
-                    const matchesStatus = (e.status === 'Upcoming' || e.status === 'Active');
-                    const searchTerm = searchQuery.trim().toLowerCase();
-                    const eventTitle = e.title.trim().toLowerCase();
-                    const matchesSearch = searchTerm === '' || eventTitle.includes(searchTerm);
-                    return matchesMonth && matchesStatus && matchesSearch;
-                  })
-                  .sort((a, b) => a.day - b.day);
-                
-                if (filteredEvents.length === 0) {
+                if (loading) {
                   return (
                     <div className="no-bookings-message">
                       <EventNoteIcon className="no-bookings-icon" />
-                      <p>No scheduled booking for this month</p>
+                      <p>Loading bookings...</p>
                     </div>
                   );
                 }
                 
-                return filteredEvents.map(event => {
-                  // Map status: Upcoming -> pending, Active -> approved
-                  // For demo, we'll use the existing status and map it
-                  const getStatusDisplay = (status) => {
-                    if (status === 'Upcoming') return 'Pending';
-                    if (status === 'Active') return 'Approved';
-                    return status;
-                  };
-                  
-                  const statusDisplay = getStatusDisplay(event.status);
+                const currentMonth = currentDate.getMonth();
+                const currentYear = currentDate.getFullYear();
+                
+                // Filter bookings by trekDate month/year, day (if selected), status filter, and search
+                const filteredBookings = allBookings
+                  .filter(booking => {
+                    if (!booking.trekDate) return false;
+                    
+                    const trekDate = booking.trekDate instanceof Timestamp 
+                      ? booking.trekDate.toDate() 
+                      : new Date(booking.trekDate);
+                    
+                    const matchesMonth = trekDate.getMonth() === currentMonth;
+                    const matchesYear = trekDate.getFullYear() === currentYear;
+                    // If a day is selected, filter by that day; otherwise show all days
+                    const matchesDay = selectedDay === null || trekDate.getDate() === selectedDay;
+                    
+                    // Apply status filter
+                    const status = booking.status?.toLowerCase();
+                    let matchesStatus = true;
+                    if (selectedFilter !== 'all') {
+                      if (selectedFilter === 'completed') {
+                        matchesStatus = status === 'completed';
+                      } else if (selectedFilter === 'approve') {
+                        matchesStatus = status === 'approved';
+                      } else if (selectedFilter === 'canceled') {
+                        matchesStatus = status === 'cancelled' || status === 'rejected';
+                      } else if (selectedFilter === 'pending') {
+                        matchesStatus = status === 'pending';
+                      }
+                    } else {
+                      // Show all statuses when 'all' is selected
+                      matchesStatus = true;
+                    }
+                    
+                    const searchTerm = searchQuery.trim().toLowerCase();
+                    const affiliation = (booking.affiliation || '').toLowerCase();
+                    const matchesSearch = searchTerm === '' || affiliation.includes(searchTerm);
+                    
+                    return matchesMonth && matchesYear && matchesDay && matchesStatus && matchesSearch;
+                  })
+                  .sort((a, b) => {
+                    const dateA = a.trekDate instanceof Timestamp ? a.trekDate.toDate() : new Date(a.trekDate);
+                    const dateB = b.trekDate instanceof Timestamp ? b.trekDate.toDate() : new Date(b.trekDate);
+                    return dateA.getDate() - dateB.getDate();
+                  });
+                
+                if (filteredBookings.length === 0) {
+                  let message = 'No scheduled booking';
+                  if (selectedDay !== null) {
+                    message = `No scheduled booking for ${selectedDay} ${currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+                  } else if (selectedFilter !== 'all') {
+                    const filterLabel = selectedFilter === 'completed' ? 'completed' :
+                                      selectedFilter === 'approve' ? 'approved' :
+                                      selectedFilter === 'canceled' ? 'cancelled' :
+                                      selectedFilter === 'pending' ? 'pending' : '';
+                    message = `No ${filterLabel} bookings for this month`;
+                  } else {
+                    message = 'No scheduled booking for this month';
+                  }
                   
                   return (
-                    <div key={event.id} className="upcoming-event-item">
+                    <div className="no-bookings-message">
+                      <EventNoteIcon className="no-bookings-icon" />
+                      <p>{message}</p>
+                    </div>
+                  );
+                }
+                
+                return filteredBookings.map(booking => {
+                  const trekDate = booking.trekDate instanceof Timestamp 
+                    ? booking.trekDate.toDate() 
+                    : new Date(booking.trekDate);
+                  const day = trekDate.getDate();
+                  const month = trekDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+                  
+                  // Map status
+                  const status = booking.status?.toLowerCase();
+                  let statusDisplay = 'Pending';
+                  if (status === 'approved') {
+                    statusDisplay = 'Approved';
+                  } else if (status === 'completed') {
+                    statusDisplay = 'Completed';
+                  } else if (status === 'cancelled' || status === 'rejected') {
+                    statusDisplay = 'Cancelled';
+                  }
+                  
+                  return (
+                    <div key={booking.id} className="upcoming-event-item">
                       <div className="upcoming-event-left">
-                        <div className="upcoming-event-date">{event.day} {event.month}</div>
+                        <div className="upcoming-event-date">{day} {month}</div>
                       </div>
                       <div className="upcoming-event-content">
                         <div className="upcoming-event-location">Mt. Hamiguitan</div>
-                        <div className="upcoming-event-affiliation">{event.title}</div>
-                        <div className="upcoming-event-trekkers">{event.participants} Trekkers</div>
+                        <div className="upcoming-event-affiliation">{booking.affiliation || 'Trek Request'}</div>
+                        <div className="upcoming-event-trekkers">{booking.numberOfPorters || 1} Trekkers</div>
                       </div>
                       <div className="upcoming-event-right">
                         <div className={`upcoming-event-status status-${statusDisplay.toLowerCase()}`} data-status={statusDisplay}>{statusDisplay}</div>
@@ -976,9 +982,10 @@ function ManageSchedule() {
           {/* Calendar Grid */}
           <div className="calendar-view-grid">
             <div className="calendar-weekdays-header">
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => {
                 const currentDayOfWeek = getDayOfWeek(currentDate, selectedDay);
-                const dayIndex = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Convert Sunday=0 to Monday=0
+                // Calendar starts on Sunday (0), so no conversion needed
+                const dayIndex = currentDayOfWeek;
                 const isCurrentDay = index === dayIndex;
                 return (
                   <div key={day} className={`calendar-weekday-header ${isCurrentDay ? 'highlighted' : ''}`}>
@@ -998,10 +1005,11 @@ function ManageSchedule() {
                 const prevMonth = new Date(year, month, 0);
                 const prevMonthDays = prevMonth.getDate();
                 
-                // Adjust starting day (Monday = 0, Sunday = 6)
-                const adjustedStart = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
+                // JavaScript's getDay() returns 0 for Sunday, 1 for Monday, etc.
+                // Calendar starts on Sunday (0), so no adjustment needed
+                const adjustedStart = startingDayOfWeek;
                 
-                // Days from previous month
+                // Days from previous month (fill in the gap before the first day of current month)
                 for (let i = adjustedStart - 1; i >= 0; i--) {
                   const day = prevMonthDays - i;
                   days.push(
@@ -1013,20 +1021,36 @@ function ManageSchedule() {
                 
                 // Days of the current month
                 for (let day = 1; day <= daysInMonth; day++) {
+                  const dayEvents = getEventsForDay(day);
+                  const bookingCount = dayEvents.length;
+                  const hasEvents = bookingCount > 0;
                   const isSelected = day === selectedDay;
                   
                   days.push(
                     <div 
                       key={day} 
-                      className={`calendar-day-cell ${isSelected ? 'selected' : ''}`}
-                      onClick={() => setSelectedDay(day)}
+                      className={`calendar-day-cell ${isSelected ? 'selected' : ''} ${hasEvents ? 'has-events' : ''}`}
+                      onClick={() => {
+                        // Toggle: if same day is clicked, deselect it
+                        if (selectedDay === day) {
+                          setSelectedDay(null);
+                        } else {
+                          setSelectedDay(day);
+                        }
+                      }}
                     >
                       <div className="calendar-day-number">{day}</div>
-                          </div>
+                      {hasEvents && (
+                        <div className="calendar-day-booking-count">
+                          <span className="booking-count-number">{bookingCount}</span>
+                          <span className="booking-count-label">{bookingCount === 1 ? 'booking' : 'bookings'}</span>
+                        </div>
+                      )}
+                    </div>
                   );
                 }
                 
-                // Fill remaining cells with next month's days
+                // Fill remaining cells with next month's days to complete the grid (always 7 columns)
                 const totalCells = days.length;
                 const cellsInGrid = Math.ceil(totalCells / 7) * 7;
                 const remainingCells = cellsInGrid - totalCells;
@@ -1058,6 +1082,75 @@ function ManageSchedule() {
               <span className="slot-indicator-label">Full</span>
             </div>
           </div>
+          
+          {/* Bookings List for Selected Day */}
+          {selectedDay !== null && (
+            <div className="calendar-day-bookings-section">
+              <div className="calendar-day-bookings-header">
+                <h3 className="calendar-day-bookings-title">
+                  Bookings for {formatCurrentDay(currentDate, selectedDay)}
+                </h3>
+              </div>
+              <div className="calendar-day-bookings-list">
+                {(() => {
+                  if (loading) {
+                    return (
+                      <div className="no-bookings-message">
+                        <EventNoteIcon className="no-bookings-icon" />
+                        <p>Loading bookings...</p>
+                      </div>
+                    );
+                  }
+                  
+                  const dayBookings = getEventsForDay(selectedDay);
+                  
+                  if (dayBookings.length === 0) {
+                    return (
+                      <div className="no-bookings-message">
+                        <EventNoteIcon className="no-bookings-icon" />
+                        <p>No bookings for this day</p>
+                      </div>
+                    );
+                  }
+                  
+                  return dayBookings.map(booking => {
+                    const trekDate = booking.trekDate instanceof Timestamp 
+                      ? booking.trekDate.toDate() 
+                      : new Date(booking.trekDate);
+                    const day = trekDate.getDate();
+                    const month = trekDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+                    
+                    // Map status
+                    const status = booking.status?.toLowerCase();
+                    let statusDisplay = 'Pending';
+                    if (status === 'approved') {
+                      statusDisplay = 'Approved';
+                    } else if (status === 'completed') {
+                      statusDisplay = 'Completed';
+                    } else if (status === 'cancelled' || status === 'rejected') {
+                      statusDisplay = 'Cancelled';
+                    }
+                    
+                    return (
+                      <div key={booking.id} className="upcoming-event-item">
+                        <div className="upcoming-event-left">
+                          <div className="upcoming-event-date">{day} {month}</div>
+                        </div>
+                        <div className="upcoming-event-content">
+                          <div className="upcoming-event-location">Mt. Hamiguitan</div>
+                          <div className="upcoming-event-affiliation">{booking.affiliation || 'Trek Request'}</div>
+                          <div className="upcoming-event-trekkers">{booking.numberOfPorters || 1} Trekkers</div>
+                        </div>
+                        <div className="upcoming-event-right">
+                          <div className={`upcoming-event-status status-${statusDisplay.toLowerCase()}`} data-status={statusDisplay}>{statusDisplay}</div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

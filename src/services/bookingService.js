@@ -363,7 +363,7 @@ export const formatBookingDate = (date, format = 'short') => {
     case 'long':
       return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     case 'full':
-      return dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      return dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     default:
       return dateObj.toLocaleDateString();
   }
