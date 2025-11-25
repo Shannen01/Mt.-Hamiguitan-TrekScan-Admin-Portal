@@ -163,6 +163,16 @@ export const queryDocuments = async (
     }));
   } catch (error) {
     console.error(`Error querying documents from ${collectionName}:`, error);
+    
+    // Check if it's a missing index error
+    if (error.code === 'failed-precondition' && error.message && error.message.includes('index')) {
+      // Extract the index creation URL from the error message if available
+      const urlMatch = error.message.match(/https:\/\/[^\s\)]+/);
+      if (urlMatch) {
+        error.indexUrl = urlMatch[0];
+      }
+    }
+    
     throw error;
   }
 };

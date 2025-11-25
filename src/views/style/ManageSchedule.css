@@ -1043,6 +1043,84 @@
   border-color: #ef4444;
 }
 
+/* Availability classes for calendar days */
+.calendar-day-compact.available {
+  background: transparent;
+}
+
+.calendar-day-compact.available.has-events {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.calendar-day-compact.limited {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.calendar-day-compact.limited.has-events {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.calendar-day-compact.full {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.calendar-day-compact.full.has-events {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.calendar-day-compact.closed {
+  background: rgba(239, 68, 68, 0.15);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.calendar-day-compact.closed .day-number-compact {
+  color: #ef4444;
+  text-decoration: line-through;
+}
+
+.calendar-day-compact.closed.selected {
+  background: rgba(239, 68, 68, 0.3);
+  opacity: 0.8;
+}
+
+/* Closed indicator */
+.closed-indicator-compact {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.closed-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  padding: 2px;
+}
+
+/* Calendar day info banner */
+.calendar-day-info-banner {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 /* Past Events Section */
 .past-events-section {
   background: #ffffff;
@@ -1513,6 +1591,47 @@
 
 .calendar-day-cell.has-cancelled.selected .booking-count-label {
   color: #ffffff;
+}
+
+/* Availability classes for calendar view days */
+.calendar-day-cell.available {
+  background: transparent;
+}
+
+.calendar-day-cell.available.has-events {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.calendar-day-cell.limited {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.calendar-day-cell.limited.has-events {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.calendar-day-cell.full {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.calendar-day-cell.full.has-events {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.calendar-day-cell.closed {
+  background: rgba(239, 68, 68, 0.15);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.calendar-day-cell.closed .calendar-day-number {
+  color: #ef4444;
+  text-decoration: line-through;
+}
+
+.calendar-day-cell.closed.selected {
+  background: rgba(239, 68, 68, 0.3);
+  opacity: 0.8;
 }
 
 /* Calendar Day Bookings Section */

@@ -6,12 +6,14 @@ import {
   updateBookingStatus,
   searchBookings,
   subscribeToBookings,
-  formatBookingDate
+  formatBookingDate,
+  checkTrekDateCapacity
 } from '../../services/bookingService';
 import { getUserById } from '../../services/userService';
 import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
 import Attachment from '../../models/Attachment';
 import { Timestamp } from 'firebase/firestore';
+import { useToast, ToastContainer } from '../../components/Toast';
 
 function ClimbRequest() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,9 +39,17 @@ function ClimbRequest() {
     email: '',
     affiliation: '',
     numberOfPorters: '',
-    purposeOfClimb: ''
+    purposeOfClimb: '',
+    location: ''
   });
   const [adminNote, setAdminNote] = useState('');
+  const [capacityInfo, setCapacityInfo] = useState(null);
+  const [checkingCapacity, setCheckingCapacity] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [showFileViewer, setShowFileViewer] = useState(false);
+
+  // Toast notifications
+  const { toasts, removeToast, success, error: showError, warning, info } = useToast();
 
   // Climb requests from Firebase
   const [requests, setRequests] = useState([]);
@@ -110,6 +120,7 @@ function ClimbRequest() {
               affiliation: booking.affiliation || 'N/A',
               numberOfPorters: booking.numberOfPorters || 0,
               purposeOfClimb: booking.notes || booking.trekType || 'N/A',
+              location: booking.location || null,
               requestedDate: formatBookingDate(booking.trekDate, 'full'),
               dateSubmitted: formatBookingDate(booking.createdAt, 'full'),
               status: capitalizeStatus(booking.status),
@@ -136,6 +147,7 @@ function ClimbRequest() {
               affiliation: booking.affiliation || 'N/A',
               numberOfPorters: booking.numberOfPorters || 0,
               purposeOfClimb: booking.notes || booking.trekType || 'N/A',
+              location: booking.location || null,
               requestedDate: formatBookingDate(booking.trekDate, 'full'),
               dateSubmitted: formatBookingDate(booking.createdAt, 'full'),
               status: capitalizeStatus(booking.status),
@@ -185,6 +197,17 @@ function ClimbRequest() {
     return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   };
 
+  // Helper function to format location for display
+  const formatLocation = (location) => {
+    if (!location) return 'Not specified';
+    const locationMap = {
+      'inside_san_isidro': 'Inside San Isidro',
+      'inside_davao_oriental': 'Inside Davao Oriental',
+      'outside_davao_oriental': 'Outside Davao Oriental'
+    };
+    return locationMap[location] || location.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
   // Check authentication and load requests on component mount and when filters change
   useEffect(() => {
     // Check if user is authenticated
@@ -207,12 +230,26 @@ function ClimbRequest() {
       }
     });
 
+    // Set up real-time subscription for bookings
+    let unsubscribeBookings = null;
+    if (currentUser) {
+      unsubscribeBookings = subscribeToBookings(() => {
+        // Refresh requests when bookings change (including cancellations)
+        fetchClimbRequests();
+      });
+    }
+
     // Fetch requests if authenticated
     if (currentUser) {
       fetchClimbRequests();
     }
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubscribeBookings) {
+        unsubscribeBookings();
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStatus, selectedMonth]);
 
@@ -236,6 +273,21 @@ function ClimbRequest() {
         // Fetch user data
         const user = booking.userId ? await getUserById(booking.userId) : null;
         console.log('User data:', user);
+        console.log('Booking data:', booking);
+        console.log('Booking location:', booking.location);
+        
+        // Check capacity for this trek date
+        setCheckingCapacity(true);
+        try {
+          const capacity = await checkTrekDateCapacity(booking.trekDate, booking.id);
+          setCapacityInfo(capacity);
+          console.log('Capacity info:', capacity);
+        } catch (capErr) {
+          console.error('Error checking capacity:', capErr);
+          setCapacityInfo(null);
+        } finally {
+          setCheckingCapacity(false);
+        }
         
         // Map booking to UI format
         const request = {
@@ -250,6 +302,7 @@ function ClimbRequest() {
           affiliation: booking.affiliation || 'N/A',
           numberOfPorters: booking.numberOfPorters || 0,
           purposeOfClimb: booking.notes || booking.trekType || 'N/A',
+          location: booking.location || null,
           requestedDate: formatBookingDate(booking.trekDate, 'short'),
           dateSubmitted: formatBookingDate(booking.createdAt, 'short'),
           status: capitalizeStatus(booking.status),
@@ -275,7 +328,8 @@ function ClimbRequest() {
           email: request.email || '',
           affiliation: request.affiliation || '',
           numberOfPorters: request.numberOfPorters ? String(request.numberOfPorters) : '',
-          purposeOfClimb: request.purposeOfClimb || ''
+          purposeOfClimb: request.purposeOfClimb || '',
+          location: request.location || ''
         });
         
         // Map attachments to documents format for display
@@ -320,11 +374,16 @@ function ClimbRequest() {
         console.log('Setting selected request and showing modal');
         setShowDetailsModal(true);
         setLoadingDetails(false);
+        
+        // Reset capacity info when closing modal
+        if (!showDetailsModal) {
+          setCapacityInfo(null);
+        }
       } catch (err) {
         console.error('Error fetching request details:', err);
         console.error('Error stack:', err.stack);
         setLoadingDetails(false);
-        alert(`Failed to load request details: ${err.message || 'Unknown error'}`);
+        showError(`Failed to load request details: ${err.message || 'Unknown error'}`, 6000);
       }
     } else if (action === 'approve' || action === 'reject' || action === 'pending') {
       try {
@@ -337,6 +396,14 @@ function ClimbRequest() {
         const bookingStatus = statusMap[action] || 'pending';
         
         await updateBookingStatus(requestId, bookingStatus);
+        
+        // Show success message
+        const actionMessages = {
+          'approved': 'Request approved successfully',
+          'rejected': 'Request rejected successfully',
+          'pending': 'Request status updated to pending'
+        };
+        success(actionMessages[bookingStatus] || 'Request status updated successfully', 4000);
         
         // Update local state with capitalized status for display
         const displayStatus = capitalizeStatus(bookingStatus);
@@ -351,19 +418,127 @@ function ClimbRequest() {
         // Update selected request if modal is open
         if (selectedRequest && selectedRequest.id === requestId) {
           setSelectedRequest({ ...selectedRequest, status: displayStatus });
+          // Refresh capacity info after approval
+          if (bookingStatus === 'approved' && selectedRequest._booking?.trekDate) {
+            try {
+              const capacity = await checkTrekDateCapacity(selectedRequest._booking.trekDate, requestId);
+              setCapacityInfo(capacity);
+            } catch (capErr) {
+              console.error('Error refreshing capacity:', capErr);
+            }
+          }
         }
       } catch (err) {
         console.error('Error updating request status:', err);
-        alert('Failed to update request status. Please try again.');
+        console.error('Error details:', {
+          message: err.message,
+          code: err.code,
+          stack: err.stack
+        });
+        
+        // Check if error is about capacity
+        if (err.message && err.message.includes('maximum capacity')) {
+          showError(err.message, 7000);
+          // Refresh capacity info if modal is open
+          if (selectedRequest && selectedRequest.id === requestId && selectedRequest._booking?.trekDate) {
+            try {
+              const capacity = await checkTrekDateCapacity(selectedRequest._booking.trekDate, requestId);
+              setCapacityInfo(capacity);
+            } catch (capErr) {
+              console.error('Error refreshing capacity:', capErr);
+            }
+          }
+        } else if (err.message && err.message.includes('trek date')) {
+          // Error about missing trek date
+          showError(err.message, 6000);
+        } else if (err.message && err.message.includes('Booking not found')) {
+          showError('Booking not found. Please refresh the page and try again.', 6000);
+        } else if (err.code === 'INDEX_REQUIRED' || err.message?.includes('index') || err.indexUrl) {
+          // Firestore index error - show with longer duration and instructions
+          let indexMessage = '⚠️ Firestore index required for capacity checking. ';
+          
+          // Extract index URL from error object or message
+          let indexUrl = err.indexUrl;
+          if (!indexUrl && err.message) {
+            // Try to extract full URL from message
+            const urlPattern = /https:\/\/console\.firebase\.google\.com[^\s\)]+/;
+            const urlMatch = err.message.match(urlPattern);
+            indexUrl = urlMatch ? urlMatch[0] : null;
+          }
+          
+          if (indexUrl) {
+            // Show the full URL and make it copyable
+            indexMessage = '⚠️ Firestore index required for capacity checking. Click the button below to create it.';
+            
+            // Log the full URL in a way that's easy to copy
+            console.error('═══════════════════════════════════════════════════════');
+            console.error('🔗 FIREBASE INDEX CREATION URL (COPY THIS):');
+            console.error('═══════════════════════════════════════════════════════');
+            console.error(indexUrl);
+            console.error('═══════════════════════════════════════════════════════');
+            console.error('📝 STEP-BY-STEP INSTRUCTIONS:');
+            console.error('1. Click the "Create Index" button in the error message above');
+            console.error('2. Or copy the URL above and open it in a new browser tab');
+            console.error('3. You should see the Firebase Console with the index pre-configured');
+            console.error('4. Click "Create Index" button');
+            console.error('5. Wait 1-5 minutes for the index to build (you\'ll see status: "Building" → "Enabled")');
+            console.error('6. Once enabled, refresh this page and try approving again');
+            console.error('═══════════════════════════════════════════════════════');
+            
+            // Store URL in a global variable for easy access
+            try {
+              window.firebaseIndexUrl = indexUrl;
+              console.error('💡 TIP: The URL is also stored in window.firebaseIndexUrl');
+              console.error('   You can copy it by running: copy(window.firebaseIndexUrl)');
+            } catch (e) {
+              // Ignore if can't store
+            }
+            
+            // Show error with action button
+            showError(indexMessage, 20000, {
+              label: '🔗 Create Index',
+              onClick: () => {
+                window.open(indexUrl, '_blank');
+                console.log('Opening index creation URL:', indexUrl);
+              }
+            });
+          } else {
+            indexMessage += '\n\nPlease create a composite index in Firestore Console:\n- Collection: bookings\n- Fields: status (Ascending), trekDate (Ascending)';
+            console.error('📝 Manual Index Creation:');
+            console.error('1. Go to Firebase Console → Firestore → Indexes');
+            console.error('2. Click "Create Index"');
+            console.error('3. Collection: bookings');
+            console.error('4. Add field: status (Ascending)');
+            console.error('5. Add field: trekDate (Ascending)');
+            console.error('6. Click "Create"');
+          }
+          
+          showError(indexMessage, 15000);
+          // Also log the full error for debugging
+          console.error('Firestore index error. Full error:', err);
+        } else if (err.message && err.message.includes('Failed to check capacity')) {
+          showError(err.message, 6000);
+        } else {
+          // Show the actual error message if available, otherwise generic message
+          const errorMessage = err.message || 'Failed to update request status. Please try again.';
+          showError(errorMessage, 6000);
+        }
+        throw err; // Re-throw to let caller handle it
       }
     }
   };
 
-  const handleFileOpen = (file) => {
+  const handleFileOpen = (file, e) => {
+    // Prevent any default behavior (form submission, etc.)
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     // Handle both old format (file.url) and new format (file.downloadURL or file.url)
     const url = file.downloadURL || file.url;
     if (url) {
-      window.open(url, '_blank');
+      setSelectedFile(file);
+      setShowFileViewer(true);
     }
   };
 
@@ -423,7 +598,7 @@ function ClimbRequest() {
   const handleExport = (format) => {
     // Export functionality
     console.log(`Exporting as ${format}`);
-    alert(`Exporting data as ${format.toUpperCase()}...`);
+    info(`Exporting data as ${format.toUpperCase()}...`, 3000);
     setShowExportMenu(false);
   };
 
@@ -704,7 +879,10 @@ function ClimbRequest() {
 
         {/* Details Modal */}
         {showDetailsModal && selectedRequest && (
-          <div className="modal-backdrop" onClick={() => setShowDetailsModal(false)}>
+          <div className="modal-backdrop" onClick={() => {
+            setShowDetailsModal(false);
+            setCapacityInfo(null);
+          }}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <div className="header-content">
@@ -721,7 +899,10 @@ function ClimbRequest() {
                   </span>
                   <button 
                     className="close-btn"
-                    onClick={() => setShowDetailsModal(false)}
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setCapacityInfo(null);
+                    }}
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                       <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -821,6 +1002,18 @@ function ClimbRequest() {
                         className="form-input form-input-readonly"
                       />
                     </div>
+
+                    {/* Location */}
+                    <div className="form-field">
+                      <label>Location</label>
+                      <input
+                        type="text"
+                        name="location"
+                        value={formData.location ? formatLocation(formData.location) : 'Not specified'}
+                        readOnly
+                        className="form-input form-input-readonly"
+                      />
+                    </div>
                   </div>
 
                   {/* Documents Section */}
@@ -889,8 +1082,9 @@ function ClimbRequest() {
                                 <div className="document-card-date">Added {fileDate}</div>
                               </div>
                               <button 
+                                type="button"
                                 className="document-card-view-btn"
-                                onClick={() => handleFileOpen(file)}
+                                onClick={(e) => handleFileOpen(file, e)}
                               >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                   <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" strokeWidth="2"/>
@@ -938,12 +1132,26 @@ function ClimbRequest() {
                             // Update booking with admin notes
                             const bookingStatus = selectedRequest._booking?.status || selectedRequest.status?.toLowerCase() || 'pending';
                             await updateBookingStatus(selectedRequest.id, bookingStatus, adminNote);
-                            alert('Update sent successfully!');
+                            success('Update sent successfully!', 4000);
+                            setAdminNote(''); // Clear the textarea
                             // Refresh requests
                             await fetchClimbRequests();
+                            // Refresh capacity info if available
+                            if (selectedRequest._booking?.trekDate) {
+                              try {
+                                const capacity = await checkTrekDateCapacity(selectedRequest._booking.trekDate, selectedRequest.id);
+                                setCapacityInfo(capacity);
+                              } catch (capErr) {
+                                console.error('Error refreshing capacity:', capErr);
+                              }
+                            }
                           } catch (err) {
                             console.error('Error sending update:', err);
-                            alert('Failed to send update. Please try again.');
+                            if (err.message && err.message.includes('maximum capacity')) {
+                              showError(err.message, 7000);
+                            } else {
+                              showError('Failed to send update. Please try again.', 5000);
+                            }
                           }
                         }
                       }}
@@ -958,6 +1166,52 @@ function ClimbRequest() {
                   </div>
                 </form>
               </div>
+              {/* Capacity Warning */}
+              {capacityInfo && (
+                <div className="capacity-warning-section" style={{
+                  margin: '16px 24px',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: capacityInfo.isClosed ? '#fee' : 
+                                  capacityInfo.isFull ? '#fee' : 
+                                  capacityInfo.currentCount >= capacityInfo.maxCapacity - 3 ? '#fff3cd' : '#e7f3ff',
+                  border: `1px solid ${capacityInfo.isClosed ? '#fcc' : 
+                                  capacityInfo.isFull ? '#fcc' : 
+                                  capacityInfo.currentCount >= capacityInfo.maxCapacity - 3 ? '#ffc107' : '#b3d9ff'}`,
+                  color: capacityInfo.isClosed ? '#c33' : 
+                        capacityInfo.isFull ? '#c33' : 
+                        capacityInfo.currentCount >= capacityInfo.maxCapacity - 3 ? '#856404' : '#004085'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      {capacityInfo.isClosed || capacityInfo.isFull ? (
+                        <path d="M12 8V12M12 16H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      ) : (
+                        <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      )}
+                    </svg>
+                    <div>
+                      <strong>
+                        {capacityInfo.isClosed 
+                          ? `Date is Closed` 
+                          : capacityInfo.isFull 
+                          ? `Maximum Capacity Reached` 
+                          : capacityInfo.currentCount >= capacityInfo.maxCapacity - 3
+                          ? `Near Capacity Warning`
+                          : `Capacity Information`}
+                      </strong>
+                      <div style={{ marginTop: '4px', fontSize: '14px' }}>
+                        {capacityInfo.isClosed 
+                          ? `This trek date is closed. Approval is not allowed.`
+                          : capacityInfo.isFull 
+                          ? `This trek date has reached the maximum capacity of ${capacityInfo.maxCapacity} trekkers. Approval is not allowed.`
+                          : `This trek date currently has ${capacityInfo.currentCount} approved ${capacityInfo.currentCount === 1 ? 'trekker' : 'trekkers'} out of ${capacityInfo.maxCapacity} maximum. ${capacityInfo.maxCapacity - capacityInfo.currentCount} ${capacityInfo.maxCapacity - capacityInfo.currentCount === 1 ? 'spot remains' : 'spots remain'}.`}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {selectedRequest && (
                 <div className="modal-actions">
                   <div className="action-buttons">
@@ -967,6 +1221,7 @@ function ClimbRequest() {
                       const displayStatus = selectedRequest.status?.toLowerCase();
                       const status = bookingStatus || displayStatus || '';
                       const isPending = status === 'pending';
+                      const isDateFull = capacityInfo?.isFull || capacityInfo?.isClosed || false;
                       
                       return (
                         <>
@@ -981,7 +1236,7 @@ function ClimbRequest() {
                                 await fetchClimbRequests();
                               } catch (err) {
                                 console.error('Error rejecting request:', err);
-                                alert('Failed to reject request. Please try again.');
+                                showError('Failed to reject request. Please try again.', 5000);
                               }
                             }}
                             style={{ opacity: isPending ? 1 : 0.5, cursor: isPending ? 'pointer' : 'not-allowed' }}
@@ -994,19 +1249,49 @@ function ClimbRequest() {
                           </button>
                           <button 
                             className="btn-approve-new"
-                            disabled={!isPending}
+                            disabled={!isPending || isDateFull}
                             onClick={async () => {
-                              if (!isPending) return;
+                              if (!isPending || isDateFull) return;
+                              
+                              console.log('Approve button clicked for booking:', selectedRequest.id);
+                              console.log('Selected request:', selectedRequest);
+                              
                               try {
                                 await handleActionClick(selectedRequest.id, 'approve');
                                 setShowDetailsModal(false);
                                 await fetchClimbRequests();
                               } catch (err) {
                                 console.error('Error approving request:', err);
-                                alert('Failed to approve request. Please try again.');
+                                console.error('Error details:', {
+                                  message: err.message,
+                                  code: err.code,
+                                  stack: err.stack
+                                });
+                                
+                                // Check if error is about capacity
+                                if (err.message && err.message.includes('maximum capacity')) {
+                                  showError(err.message, 7000);
+                                  // Refresh capacity info
+                                  if (selectedRequest._booking?.trekDate) {
+                                    try {
+                                      const capacity = await checkTrekDateCapacity(selectedRequest._booking.trekDate, selectedRequest.id);
+                                      setCapacityInfo(capacity);
+                                    } catch (capErr) {
+                                      console.error('Error refreshing capacity:', capErr);
+                                    }
+                                  }
+                                } else {
+                                  // Show the actual error message
+                                  const errorMessage = err.message || 'Failed to approve request. Please try again.';
+                                  showError(errorMessage, 6000);
+                                }
                               }
                             }}
-                            style={{ opacity: isPending ? 1 : 0.5, cursor: isPending ? 'pointer' : 'not-allowed' }}
+                            style={{ 
+                              opacity: (isPending && !isDateFull) ? 1 : 0.5, 
+                              cursor: (isPending && !isDateFull) ? 'pointer' : 'not-allowed' 
+                            }}
+                            title={isDateFull ? 'Cannot approve: This trek date has reached maximum capacity' : ''}
                           >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                               <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1019,6 +1304,100 @@ function ClimbRequest() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        
+        {/* Toast Notifications */}
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        
+        {/* File Viewer Overlay */}
+        {showFileViewer && selectedFile && (
+          <div className="file-viewer-overlay" onClick={() => setShowFileViewer(false)}>
+            <div className="file-viewer-container" onClick={(e) => e.stopPropagation()}>
+              <div className="file-viewer-header">
+                <div className="file-viewer-title">
+                  <h3>{selectedFile.name || selectedFile.fileName || 'Document'}</h3>
+                  <span className="file-viewer-type">
+                    {selectedFile.type?.includes('pdf') ? 'PDF' : 
+                     selectedFile.type?.startsWith('image/') ? 'Image' : 
+                     'Document'}
+                  </span>
+                </div>
+                <button 
+                  className="file-viewer-close"
+                  onClick={() => setShowFileViewer(false)}
+                  aria-label="Close"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+              <div className="file-viewer-content">
+                {(() => {
+                  const url = selectedFile.downloadURL || selectedFile.url;
+                  const fileType = selectedFile.type || selectedFile.mimeType || '';
+                  const isPDF = fileType.includes('pdf');
+                  const isImage = fileType.startsWith('image/');
+                  
+                  if (isPDF) {
+                    return (
+                      <iframe
+                        src={url}
+                        className="file-viewer-iframe"
+                        title={selectedFile.name || 'PDF Document'}
+                      />
+                    );
+                  } else if (isImage) {
+                    return (
+                      <div className="file-viewer-image-container">
+                        <img
+                          src={url}
+                          alt={selectedFile.name || 'Image'}
+                          className="file-viewer-image"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                        <div className="file-viewer-fallback" style={{ display: 'none' }}>
+                          <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
+                            <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2"/>
+                          </svg>
+                          <p>Unable to display image</p>
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    // For other file types, show download option
+                    return (
+                      <div className="file-viewer-unsupported">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
+                          <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2"/>
+                        </svg>
+                        <p>Preview not available for this file type</p>
+                        <a
+                          href={url}
+                          download={selectedFile.name || selectedFile.fileName}
+                          className="file-viewer-download-btn"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                          Download File
+                        </a>
+                      </div>
+                    );
+                  }
+                })()}
+              </div>
             </div>
           </div>
         )}

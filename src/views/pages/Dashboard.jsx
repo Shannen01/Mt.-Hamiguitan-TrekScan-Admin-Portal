@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, Box, Typography, LinearProgress } from '@mui/material';
 import { Hiking } from '@mui/icons-material';
-import { getAllBookings, formatBookingDate } from '../../services/bookingService';
+import { getAllBookings, formatBookingDate, subscribeToBookings } from '../../services/bookingService';
 import { getUserById } from '../../services/userService';
 import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
 import { Timestamp } from 'firebase/firestore';
@@ -234,6 +234,7 @@ function Dashboard({ onNavigate }) {
         })
         .slice(0, 4); // Limit to 4 recent approvals
 
+      
       // Fetch user data for recent approvals
       const recentWithUsers = await Promise.all(
         recentApprovedBookings.map(async (booking) => {
@@ -340,10 +341,30 @@ function Dashboard({ onNavigate }) {
       return;
     }
 
+    // Set up real-time subscription for bookings to detect cancellations
+    let unsubscribeBookings = null;
+    if (currentUser) {
+      unsubscribeBookings = subscribeToBookings(() => {
+        // Refresh dashboard data when bookings change (including cancellations)
+        fetchDashboardData();
+      });
+    }
+
     const unsubscribe = onAuthStateChange((user) => {
       if (user) {
         fetchDashboardData();
+        // Set up subscription when user is authenticated
+        if (!unsubscribeBookings) {
+          unsubscribeBookings = subscribeToBookings(() => {
+            fetchDashboardData();
+          });
+        }
       } else {
+        // Clean up subscription when user logs out
+        if (unsubscribeBookings) {
+          unsubscribeBookings();
+          unsubscribeBookings = null;
+        }
         setUpcomingClimbs([]);
         setRecentApprovals([]);
         setTodaysTrekkers([]);
@@ -361,7 +382,12 @@ function Dashboard({ onNavigate }) {
       fetchDashboardData();
     }
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubscribeBookings) {
+        unsubscribeBookings();
+      }
+    };
   }, []);
 
   const StatsCard = ({ title, value, subtitle, progress }) => (

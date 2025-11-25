@@ -9,6 +9,11 @@ import EventNoteIcon from '@mui/icons-material/EventNote';
 import { getAllBookings } from '../../services/bookingService';
 import { getUserById } from '../../services/userService';
 import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
+import { 
+  getCalendarConfigsForMonth, 
+  getCalendarSettings,
+  getCalendarConfigForDate 
+} from '../../services/calendarService';
 import { Timestamp } from 'firebase/firestore';
 import '../style/ManageSchedule.css';
 
@@ -22,12 +27,14 @@ function ManageSchedule() {
   const [searchQuery, setSearchQuery] = useState('');
   const [allBookings, setAllBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [calendarConfigs, setCalendarConfigs] = useState({}); // Map of date strings to configs
+  const [calendarSettings, setCalendarSettings] = useState(null);
   const filterRef = useRef(null);
   const monthYearRef = useRef(null);
 
-  // Fetch bookings from Firebase
+  // Fetch bookings and calendar configs from Firebase
   useEffect(() => {
-    const fetchBookings = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         const currentUser = getCurrentUser();
@@ -36,11 +43,18 @@ function ManageSchedule() {
           return;
         }
 
-        const bookings = await getAllBookings();
+        // Fetch bookings and calendar data in parallel
+        const [bookings, settings] = await Promise.all([
+          getAllBookings(),
+          getCalendarSettings()
+        ]);
+        
         setAllBookings(bookings);
+        setCalendarSettings(settings);
       } catch (error) {
-        console.error('Error fetching bookings:', error);
+        console.error('Error fetching data:', error);
         setAllBookings([]);
+        setCalendarSettings(null);
       } finally {
         setLoading(false);
       }
@@ -48,20 +62,58 @@ function ManageSchedule() {
 
     const unsubscribe = onAuthStateChange((user) => {
       if (user) {
-        fetchBookings();
+        fetchData();
       } else {
         setAllBookings([]);
+        setCalendarSettings(null);
         setLoading(false);
       }
     });
 
     const currentUser = getCurrentUser();
     if (currentUser) {
-      fetchBookings();
+      fetchData();
     }
 
     return () => unsubscribe();
   }, []);
+
+  // Fetch calendar configs for current month
+  useEffect(() => {
+    const fetchCalendarConfigs = async () => {
+      try {
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+        const configs = await getCalendarConfigsForMonth(currentMonth, currentYear);
+        
+        // Convert to map for easy lookup
+        const configMap = {};
+        configs.forEach(config => {
+          const dateKey = formatDateKey(config.date);
+          configMap[dateKey] = config;
+        });
+        
+        setCalendarConfigs(configMap);
+      } catch (error) {
+        console.error('Error fetching calendar configs:', error);
+        setCalendarConfigs({});
+      }
+    };
+
+    if (calendarSettings) {
+      fetchCalendarConfigs();
+    }
+  }, [currentDate, calendarSettings]);
+
+  // Helper function to format date as YYYY-MM-DD key
+  const formatDateKey = (date) => {
+    if (!date) return '';
+    const d = date instanceof Date ? date : new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   // Convert bookings to events format based on trekDate
   const convertBookingsToEvents = async (bookings) => {
@@ -349,8 +401,8 @@ function ManageSchedule() {
       return trekDate.getMonth() === currentMonth && trekDate.getFullYear() === currentYear;
     });
     
-    // Assume max capacity per day is 50 (can be adjusted)
-    const MAX_CAPACITY = 50;
+    // Get default max capacity from calendar settings
+    const DEFAULT_MAX_CAPACITY = calendarSettings?.defaultMaxSlots || 30;
     
     let available = 0; // Green - 0-30% booked
     let limited = 0;   // Yellow/Orange - 30-80% booked
@@ -373,9 +425,22 @@ function ManageSchedule() {
       bookingsByDay[day] += (booking.numberOfPorters || 1);
     });
     
-    // Count days by availability status
-    Object.values(bookingsByDay).forEach(participants => {
-      const percentage = (participants / MAX_CAPACITY) * 100;
+    // Count days by availability status (using date-specific maxSlots if available)
+    Object.entries(bookingsByDay).forEach(([day, participants]) => {
+      const dayNum = parseInt(day);
+      const dateKey = formatDateKey(new Date(currentYear, currentMonth, dayNum));
+      const dateConfig = calendarConfigs[dateKey];
+      
+      // Use date-specific maxSlots or default
+      const maxCapacity = dateConfig?.maxSlots || DEFAULT_MAX_CAPACITY;
+      
+      // If date is closed, count as full
+      if (dateConfig?.isClosed) {
+        full++;
+        return;
+      }
+      
+      const percentage = (participants / maxCapacity) * 100;
       if (percentage < 30) {
         available++;
       } else if (percentage < 80) {
@@ -628,10 +693,34 @@ function ManageSchedule() {
                       const hasEvents = bookingCount > 0;
                       const isSelected = day === selectedDay;
                       
+                      // Check calendar config for this day
+                      const dateKey = formatDateKey(new Date(year, month, day));
+                      const dateConfig = calendarConfigs[dateKey];
+                      const isClosed = dateConfig?.isClosed || false;
+                      const maxSlots = dateConfig?.maxSlots || calendarSettings?.defaultMaxSlots || 30;
+                      
+                      // Calculate availability percentage
+                      let availabilityClass = '';
+                      if (isClosed) {
+                        availabilityClass = 'closed';
+                      } else if (hasEvents) {
+                        const participants = dayEvents.reduce((sum, booking) => sum + (booking.numberOfPorters || 1), 0);
+                        const percentage = (participants / maxSlots) * 100;
+                        if (percentage >= 80) {
+                          availabilityClass = 'full';
+                        } else if (percentage >= 30) {
+                          availabilityClass = 'limited';
+                        } else {
+                          availabilityClass = 'available';
+                        }
+                      } else {
+                        availabilityClass = 'available';
+                      }
+                      
                       days.push(
                         <div 
                           key={day} 
-                          className={`calendar-day-compact ${isSelected ? 'selected' : ''} ${hasEvents ? 'has-events' : ''}`}
+                          className={`calendar-day-compact ${isSelected ? 'selected' : ''} ${hasEvents ? 'has-events' : ''} ${availabilityClass}`}
                           onClick={() => {
                             // Toggle: if same day is clicked, deselect it (show all)
                             if (selectedDay === day) {
@@ -640,9 +729,19 @@ function ManageSchedule() {
                               setSelectedDay(day);
                             }
                           }}
+                          title={isClosed ? `Closed: ${dateConfig?.reason || 'No bookings allowed'}` : 
+                                 dateConfig?.customNote ? dateConfig.customNote : 
+                                 hasEvents ? `${bookingCount} booking${bookingCount > 1 ? 's' : ''}` : 'Available'}
                         >
                           <div className="day-number-compact">{day}</div>
-                          {hasEvents && (
+                          {isClosed && (
+                            <div className="closed-indicator-compact" title={dateConfig?.reason || 'Closed'}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                              </svg>
+                            </div>
+                          )}
+                          {hasEvents && !isClosed && (
                             <div className="booking-count-badge-compact">
                               {bookingCount}
                             </div>
@@ -1026,10 +1125,34 @@ function ManageSchedule() {
                   const hasEvents = bookingCount > 0;
                   const isSelected = day === selectedDay;
                   
+                  // Check calendar config for this day
+                  const dateKey = formatDateKey(new Date(year, month, day));
+                  const dateConfig = calendarConfigs[dateKey];
+                  const isClosed = dateConfig?.isClosed || false;
+                  const maxSlots = dateConfig?.maxSlots || calendarSettings?.defaultMaxSlots || 30;
+                  
+                  // Calculate availability percentage
+                  let availabilityClass = '';
+                  if (isClosed) {
+                    availabilityClass = 'closed';
+                  } else if (hasEvents) {
+                    const participants = dayEvents.reduce((sum, booking) => sum + (booking.numberOfPorters || 1), 0);
+                    const percentage = (participants / maxSlots) * 100;
+                    if (percentage >= 80) {
+                      availabilityClass = 'full';
+                    } else if (percentage >= 30) {
+                      availabilityClass = 'limited';
+                    } else {
+                      availabilityClass = 'available';
+                    }
+                  } else {
+                    availabilityClass = 'available';
+                  }
+                  
                   days.push(
                     <div 
                       key={day} 
-                      className={`calendar-day-cell ${isSelected ? 'selected' : ''} ${hasEvents ? 'has-events' : ''}`}
+                      className={`calendar-day-cell ${isSelected ? 'selected' : ''} ${hasEvents ? 'has-events' : ''} ${availabilityClass}`}
                       onClick={() => {
                         // Toggle: if same day is clicked, deselect it
                         if (selectedDay === day) {
@@ -1038,9 +1161,19 @@ function ManageSchedule() {
                           setSelectedDay(day);
                         }
                       }}
+                      title={isClosed ? `Closed: ${dateConfig?.reason || 'No bookings allowed'}` : 
+                             dateConfig?.customNote ? dateConfig.customNote : 
+                             hasEvents ? `${bookingCount} booking${bookingCount > 1 ? 's' : ''}` : 'Available'}
                     >
                       <div className="calendar-day-number">{day}</div>
-                      {hasEvents && (
+                      {isClosed && (
+                        <div className="closed-indicator" title={dateConfig?.reason || 'Closed'}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                        </div>
+                      )}
+                      {hasEvents && !isClosed && (
                         <div className="calendar-day-booking-count">
                           <span className="booking-count-number">{bookingCount}</span>
                           <span className="booking-count-label">{bookingCount === 1 ? 'booking' : 'bookings'}</span>
@@ -1113,40 +1246,79 @@ function ManageSchedule() {
                     );
                   }
                   
-                  return dayBookings.map(booking => {
-                    const trekDate = booking.trekDate instanceof Timestamp 
-                      ? booking.trekDate.toDate() 
-                      : new Date(booking.trekDate);
-                    const day = trekDate.getDate();
-                    const month = trekDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-                    
-                    // Map status
-                    const status = booking.status?.toLowerCase();
-                    let statusDisplay = 'Pending';
-                    if (status === 'approved') {
-                      statusDisplay = 'Approved';
-                    } else if (status === 'completed') {
-                      statusDisplay = 'Completed';
-                    } else if (status === 'cancelled' || status === 'rejected') {
-                      statusDisplay = 'Cancelled';
-                    }
-                    
-                    return (
-                      <div key={booking.id} className="upcoming-event-item">
-                        <div className="upcoming-event-left">
-                          <div className="upcoming-event-date">{day} {month}</div>
+                  // Get calendar config for selected day
+                  const selectedDateKey = formatDateKey(new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay));
+                  const selectedDateConfig = calendarConfigs[selectedDateKey];
+                  
+                  return (
+                    <>
+                      {selectedDateConfig && (selectedDateConfig.isClosed || selectedDateConfig.customNote || selectedDateConfig.reason) && (
+                        <div className="calendar-day-info-banner" style={{
+                          marginBottom: '16px',
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          backgroundColor: selectedDateConfig.isClosed ? '#fee' : '#e7f3ff',
+                          border: `1px solid ${selectedDateConfig.isClosed ? '#fcc' : '#b3d9ff'}`,
+                          color: selectedDateConfig.isClosed ? '#c33' : '#004085'
+                        }}>
+                          {selectedDateConfig.isClosed && (
+                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                              ⚠️ This date is closed
+                            </div>
+                          )}
+                          {selectedDateConfig.reason && (
+                            <div style={{ fontSize: '14px', marginBottom: '4px' }}>
+                              <strong>Reason:</strong> {selectedDateConfig.reason}
+                            </div>
+                          )}
+                          {selectedDateConfig.customNote && (
+                            <div style={{ fontSize: '14px' }}>
+                              <strong>Note:</strong> {selectedDateConfig.customNote}
+                            </div>
+                          )}
+                          {selectedDateConfig.maxSlots && (
+                            <div style={{ fontSize: '14px', marginTop: '4px' }}>
+                              <strong>Max Slots:</strong> {selectedDateConfig.maxSlots}
+                            </div>
+                          )}
                         </div>
-                        <div className="upcoming-event-content">
-                          <div className="upcoming-event-location">Mt. Hamiguitan</div>
-                          <div className="upcoming-event-affiliation">{booking.affiliation || 'Trek Request'}</div>
-                          <div className="upcoming-event-trekkers">{booking.numberOfPorters || 1} Trekkers</div>
-                        </div>
-                        <div className="upcoming-event-right">
-                          <div className={`upcoming-event-status status-${statusDisplay.toLowerCase()}`} data-status={statusDisplay}>{statusDisplay}</div>
-                        </div>
-                      </div>
-                    );
-                  });
+                      )}
+                      {dayBookings.map(booking => {
+                        const trekDate = booking.trekDate instanceof Timestamp 
+                          ? booking.trekDate.toDate() 
+                          : new Date(booking.trekDate);
+                        const day = trekDate.getDate();
+                        const month = trekDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+                        
+                        // Map status
+                        const status = booking.status?.toLowerCase();
+                        let statusDisplay = 'Pending';
+                        if (status === 'approved') {
+                          statusDisplay = 'Approved';
+                        } else if (status === 'completed') {
+                          statusDisplay = 'Completed';
+                        } else if (status === 'cancelled' || status === 'rejected') {
+                          statusDisplay = 'Cancelled';
+                        }
+                        
+                        return (
+                          <div key={booking.id} className="upcoming-event-item">
+                            <div className="upcoming-event-left">
+                              <div className="upcoming-event-date">{day} {month}</div>
+                            </div>
+                            <div className="upcoming-event-content">
+                              <div className="upcoming-event-location">Mt. Hamiguitan</div>
+                              <div className="upcoming-event-affiliation">{booking.affiliation || 'Trek Request'}</div>
+                              <div className="upcoming-event-trekkers">{booking.numberOfPorters || 1} Trekkers</div>
+                            </div>
+                            <div className="upcoming-event-right">
+                              <div className={`upcoming-event-status status-${statusDisplay.toLowerCase()}`} data-status={statusDisplay}>{statusDisplay}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
                 })()}
               </div>
             </div>

@@ -3,7 +3,7 @@ import '../views/style/Dashboard.css';
 import logoImage from '../assets/TrekScan.png';
 import { Home } from 'lucide-react';
 import { Button, IconButton, Menu, MenuItem, ListItemIcon, Tooltip } from '@mui/material';
-import { Event, InsertChart, AccountCircle, Settings as SettingsIcon, Logout as LogoutIcon, Notifications as NotificationsIcon, DarkMode as DarkModeIcon, Hiking, Person, Lock, Close, Visibility, VisibilityOff, CalendarToday, CheckCircleOutline, Warning, PersonAdd, Delete, Search, CheckCircle, HighlightOff } from '@mui/icons-material';
+import { Event, InsertChart, AccountCircle, Settings as SettingsIcon, Logout as LogoutIcon, Notifications as NotificationsIcon, DarkMode as DarkModeIcon, Hiking, Person, Lock, Close, Visibility, VisibilityOff, CalendarToday, CheckCircleOutline, Warning, PersonAdd, Delete, Search, CheckCircle, HighlightOff, Build } from '@mui/icons-material';
 import { getAllBookings } from '../services/bookingService';
 import { getUserById } from '../services/userService';
 import { getCurrentUser, onAuthStateChange } from '../services/firebaseAuthService';
@@ -13,6 +13,7 @@ import Dashboard from '../views/pages/Dashboard.jsx';
 import ClimbRequest from '../views/pages/ClimbRequest.jsx';
 import ManageSchedule from '../views/pages/ManageSchedule.jsx';
 import Reports from '../views/pages/Reports.jsx';
+import Utility from '../views/pages/Utility.jsx';
 
 function AppLayout({ onLogout }) {
   const [activeItem, setActiveItem] = useState('dashboard');
@@ -416,6 +417,15 @@ function AppLayout({ onLogout }) {
               <InsertChart className="icon" style={{ fontSize: 20 }} aria-hidden="true" />
               <span>Reports</span>
             </a>
+            <a
+              className={`nav-item${activeItem === 'utility' ? ' active' : ''}`}
+              href="#"
+              onClick={(e) => { e.preventDefault(); setActiveItem('utility'); }}
+              title="Utility"
+            >
+              <Build className="icon" style={{ fontSize: 20 }} aria-hidden="true" />
+              <span>Utility</span>
+            </a>
           </nav>
         </aside>
 
@@ -427,6 +437,7 @@ function AppLayout({ onLogout }) {
                 {activeItem === 'climb' && 'Climb Request'}
                 {activeItem === 'users' && 'Booking Schedule'}
                 {activeItem === 'reports' && 'Reports'}
+                {activeItem === 'utility' && 'Utility'}
               </h1>
             </div>
             <div className="header-right">
@@ -667,6 +678,7 @@ function AppLayout({ onLogout }) {
           {activeItem === 'climb' && <ClimbRequest />}
           {activeItem === 'users' && <ManageSchedule />}
           {activeItem === 'reports' && <Reports />}
+          {activeItem === 'utility' && <Utility />}
         </main>
       </div>
 

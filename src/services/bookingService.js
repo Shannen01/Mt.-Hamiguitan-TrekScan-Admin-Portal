@@ -12,6 +12,7 @@ import {
 } from './firebaseService';
 import BookingModel from '../models/BookingModel';
 import { Timestamp } from 'firebase/firestore';
+import { getMaxSlotsForDate, isDateClosed } from './calendarService';
 
 const COLLECTION_NAME = 'bookings';
 
@@ -202,14 +203,241 @@ export const updateBooking = async (bookingId, updateData) => {
 };
 
 /**
+ * Count approved bookings for a specific trek date
+ * @param {Date|Timestamp|string} trekDate - The trek date to check
+ * @param {string} excludeBookingId - Optional booking ID to exclude from count (for updates)
+ * @returns {Promise<number>} Number of approved bookings for that date
+ */
+export const countApprovedBookingsForDate = async (trekDate, excludeBookingId = null) => {
+  try {
+    // Normalize the trek date to start of day
+    let dateObj;
+    if (trekDate instanceof Timestamp) {
+      dateObj = trekDate.toDate();
+    } else if (trekDate instanceof Date) {
+      dateObj = trekDate;
+    } else if (typeof trekDate === 'string') {
+      dateObj = new Date(trekDate);
+    } else {
+      dateObj = timestampToDate(trekDate);
+    }
+    
+    if (!dateObj || isNaN(dateObj.getTime())) {
+      throw new Error('Invalid trek date provided');
+    }
+    
+    // Set to start of day (00:00:00)
+    const startOfDay = new Date(dateObj);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    // Set to end of day (23:59:59.999)
+    const endOfDay = new Date(dateObj);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Query for approved bookings on this date
+    const firestoreFilters = [
+      {
+        field: 'status',
+        operator: '==',
+        value: 'approved'
+      },
+      {
+        field: 'trekDate',
+        operator: '>=',
+        value: dateToTimestamp(startOfDay)
+      },
+      {
+        field: 'trekDate',
+        operator: '<=',
+        value: dateToTimestamp(endOfDay)
+      }
+    ];
+    
+    const bookings = await queryDocuments(
+      COLLECTION_NAME,
+      firestoreFilters
+    );
+    
+    // Filter out the excluded booking if provided
+    let count = bookings.length;
+    if (excludeBookingId) {
+      count = bookings.filter(booking => booking.id !== excludeBookingId).length;
+    }
+    
+    return count;
+  } catch (error) {
+    console.error('Error counting approved bookings for date:', error);
+    
+    // Check if it's a missing index error
+    if (error.code === 'failed-precondition' && error.message && error.message.includes('index')) {
+      // Extract the index creation URL from the error message - get the full URL
+      // The URL might be in the message or in a separate property
+      let indexUrl = error.indexUrl || null;
+      
+      if (!indexUrl && error.message) {
+        // Try to extract from message - look for the full URL pattern
+        const urlPattern = /https:\/\/console\.firebase\.google\.com[^\s\)]+/;
+        const urlMatch = error.message.match(urlPattern);
+        indexUrl = urlMatch ? urlMatch[0] : null;
+      }
+      
+      // Create a custom error with the URL attached
+      const indexError = new Error(
+        indexUrl 
+          ? `Firestore index required. Index creation URL: ${indexUrl}`
+          : 'Firestore index required. Please create a composite index on "status" (Ascending) and "trekDate" (Ascending) fields in the Firestore console.'
+      );
+      indexError.code = 'INDEX_REQUIRED';
+      indexError.indexUrl = indexUrl;
+      indexError.originalError = error;
+      
+      throw indexError;
+    }
+    
+    throw error;
+  }
+};
+
+/**
+ * Check if a trek date has reached maximum capacity
+ * Uses calendar_config for date-specific maxSlots, or falls back to system_settings default
+ * @param {Date|Timestamp|string} trekDate - The trek date to check
+ * @param {string} excludeBookingId - Optional booking ID to exclude from count (for updates)
+ * @returns {Promise<{isFull: boolean, currentCount: number, maxCapacity: number, isClosed: boolean}>}
+ */
+export const checkTrekDateCapacity = async (trekDate, excludeBookingId = null) => {
+  try {
+    // Normalize the trek date
+    let dateObj;
+    if (trekDate instanceof Timestamp) {
+      dateObj = trekDate.toDate();
+    } else if (trekDate instanceof Date) {
+      dateObj = trekDate;
+    } else if (typeof trekDate === 'string') {
+      dateObj = new Date(trekDate);
+    } else {
+      dateObj = timestampToDate(trekDate);
+    }
+    
+    // Check if date is closed
+    const closed = await isDateClosed(dateObj);
+    if (closed) {
+      return {
+        isFull: true,
+        currentCount: 0,
+        maxCapacity: 0,
+        isClosed: true
+      };
+    }
+    
+    // Get max slots for this date (from calendar_config or system_settings)
+    const maxCapacity = await getMaxSlotsForDate(dateObj);
+    
+    // Count approved bookings
+    const currentCount = await countApprovedBookingsForDate(trekDate, excludeBookingId);
+    
+    return {
+      isFull: currentCount >= maxCapacity,
+      currentCount,
+      maxCapacity,
+      isClosed: false
+    };
+  } catch (error) {
+    console.error('Error checking trek date capacity:', error);
+    // Fall back to default capacity if error
+    const MAX_CAPACITY = 30;
+    const currentCount = await countApprovedBookingsForDate(trekDate, excludeBookingId);
+    return {
+      isFull: currentCount >= MAX_CAPACITY,
+      currentCount,
+      maxCapacity: MAX_CAPACITY,
+      isClosed: false
+    };
+  }
+};
+
+/**
  * Update booking status
  * @param {string} bookingId - Booking ID
  * @param {string} status - New status (pending, approved, rejected, cancelled)
  * @param {string} adminNotes - Optional admin notes
  * @returns {Promise<void>}
+ * @throws {Error} If trying to approve a booking when the date is full
  */
 export const updateBookingStatus = async (bookingId, status, adminNotes = null) => {
   try {
+    // Validate inputs
+    if (!bookingId) {
+      throw new Error('Booking ID is required');
+    }
+    
+    if (!status) {
+      throw new Error('Status is required');
+    }
+    
+    const validStatuses = ['pending', 'approved', 'rejected', 'cancelled'];
+    if (!validStatuses.includes(status.toLowerCase())) {
+      throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
+    }
+    
+    console.log(`Updating booking ${bookingId} status to ${status}`);
+    
+    // If approving, check capacity first
+    if (status === 'approved') {
+      console.log('Checking capacity before approval...');
+      // Get the booking to check its trek date
+      const booking = await getBookingById(bookingId);
+      console.log('Booking fetched:', booking);
+      
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+      
+      if (!booking.trekDate) {
+        console.error('Booking missing trekDate:', booking);
+        throw new Error('Booking does not have a trek date');
+      }
+      
+      console.log('Booking trekDate:', booking.trekDate, 'Type:', typeof booking.trekDate);
+      
+      // Check capacity (exclude current booking if it's already approved)
+      try {
+        const capacity = await checkTrekDateCapacity(booking.trekDate, bookingId);
+        console.log('Capacity check result:', capacity);
+        
+      if (capacity.isClosed) {
+        throw new Error(
+          `Cannot approve booking: The trek date ${formatBookingDate(booking.trekDate, 'full')} is closed.`
+        );
+      }
+      
+      if (capacity.isFull) {
+        throw new Error(
+          `Cannot approve booking: The trek date ${formatBookingDate(booking.trekDate, 'full')} has reached maximum capacity (${capacity.maxCapacity} trekkers).`
+        );
+      }
+      } catch (capError) {
+        console.error('Error during capacity check:', capError);
+        // If it's already a capacity error, re-throw it
+        if (capError.message && capError.message.includes('maximum capacity')) {
+          throw capError;
+        }
+        // If it's an index error, attach the URL and re-throw
+        if (capError.code === 'INDEX_REQUIRED' || (capError.message && capError.message.includes('index'))) {
+          // Preserve the index URL if available
+          if (capError.indexUrl) {
+            const indexError = new Error(capError.message);
+            indexError.code = 'INDEX_REQUIRED';
+            indexError.indexUrl = capError.indexUrl;
+            throw indexError;
+          }
+          throw capError;
+        }
+        // Otherwise, wrap it in a more descriptive error
+        throw new Error(`Failed to check capacity: ${capError.message || 'Unknown error'}`);
+      }
+    }
+    
     const updateData = {
       status: status,
       updatedAt: Timestamp.now()
@@ -219,10 +447,25 @@ export const updateBookingStatus = async (bookingId, status, adminNotes = null) 
       updateData.adminNotes = adminNotes;
     }
     
+    console.log('Updating document with data:', updateData);
     await updateDocument(COLLECTION_NAME, bookingId, updateData);
+    console.log('Booking status updated successfully');
   } catch (error) {
     console.error(`Error updating booking status ${bookingId}:`, error);
-    throw error;
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    
+    // Provide more specific error messages
+    if (error.message) {
+      throw error; // Re-throw with original message
+    } else if (error.code) {
+      throw new Error(`Firebase error (${error.code}): ${error.message || 'Unknown error'}`);
+    } else {
+      throw new Error(`Failed to update booking status: ${error.message || 'Unknown error'}`);
+    }
   }
 };
 
