@@ -359,7 +359,7 @@ export const checkTrekDateCapacity = async (trekDate, excludeBookingId = null) =
 /**
  * Update booking status
  * @param {string} bookingId - Booking ID
- * @param {string} status - New status (pending, approved, rejected, cancelled)
+ * @param {string} status - New status (pending, approved, rejected, cancelled, changes_required)
  * @param {string} adminNotes - Optional admin notes
  * @returns {Promise<void>}
  * @throws {Error} If trying to approve a booking when the date is full
@@ -375,7 +375,7 @@ export const updateBookingStatus = async (bookingId, status, adminNotes = null) 
       throw new Error('Status is required');
     }
     
-    const validStatuses = ['pending', 'approved', 'rejected', 'cancelled'];
+    const validStatuses = ['pending', 'approved', 'rejected', 'cancelled', 'changes_required'];
     if (!validStatuses.includes(status.toLowerCase())) {
       throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
     }

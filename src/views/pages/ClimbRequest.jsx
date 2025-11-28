@@ -14,8 +14,9 @@ import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthSe
 import Attachment from '../../models/Attachment';
 import { Timestamp } from 'firebase/firestore';
 import { useToast, ToastContainer } from '../../components/Toast';
+import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 
-function ClimbRequest() {
+function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -43,6 +44,11 @@ function ClimbRequest() {
     location: ''
   });
   const [adminNote, setAdminNote] = useState('');
+  const [remarks, setRemarks] = useState([]);
+  const [newRemarkText, setNewRemarkText] = useState('');
+  const [editingRemarkId, setEditingRemarkId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const [currentAdminName, setCurrentAdminName] = useState('Admin');
   const [capacityInfo, setCapacityInfo] = useState(null);
   const [checkingCapacity, setCheckingCapacity] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -114,8 +120,8 @@ function ClimbRequest() {
               userId: booking.userId,
               name: user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User',
               email: user?.email || 'N/A',
-              phone: 'N/A', // UserModel doesn't have phone, might need to add
-              phoneNumber: 'N/A',
+              phone: booking.phoneNumber || 'N/A',
+              phoneNumber: booking.phoneNumber || 'N/A',
               age: user?.birthDate ? calculateAge(user.birthDate) : 'N/A',
               affiliation: booking.affiliation || 'N/A',
               numberOfPorters: booking.numberOfPorters || 0,
@@ -141,9 +147,10 @@ function ClimbRequest() {
               userId: booking.userId,
               name: 'Unknown User',
               email: 'N/A',
-              phone: 'N/A',
-              phoneNumber: 'N/A',
+              phone: booking.phoneNumber || 'N/A',
+              phoneNumber: booking.phoneNumber || 'N/A',
               age: 'N/A',
+              isSeniorCitizen: false,
               affiliation: booking.affiliation || 'N/A',
               numberOfPorters: booking.numberOfPorters || 0,
               purposeOfClimb: booking.notes || booking.trekType || 'N/A',
@@ -162,8 +169,23 @@ function ClimbRequest() {
         })
       );
       
-      console.log('Mapped requests:', requestsWithUserData.length);
-      setRequests(requestsWithUserData);
+      // Sort by date submitted (createdAt) - latest first
+      const sortedRequests = requestsWithUserData.sort((a, b) => {
+        const dateA = a._booking?.createdAt;
+        const dateB = b._booking?.createdAt;
+        
+        // Handle Firestore Timestamp objects
+        const timestampA = dateA?.toDate ? dateA.toDate().getTime() : 
+                         dateA ? new Date(dateA).getTime() : 0;
+        const timestampB = dateB?.toDate ? dateB.toDate().getTime() : 
+                         dateB ? new Date(dateB).getTime() : 0;
+        
+        // Sort in descending order (latest first)
+        return timestampB - timestampA;
+      });
+      
+      console.log('Mapped requests:', sortedRequests.length);
+      setRequests(sortedRequests);
     } catch (err) {
       console.error('Error fetching bookings:', err);
       console.error('Error details:', err.message, err.stack);
@@ -191,9 +213,26 @@ function ClimbRequest() {
     }
   };
 
+  // Helper function to determine if user is a senior citizen (60+ years old)
+  const isSeniorCitizen = (birthDate) => {
+    if (!birthDate) return false;
+    try {
+      const age = parseInt(calculateAge(birthDate));
+      return !isNaN(age) && age >= 60;
+    } catch {
+      return false;
+    }
+  };
+
   // Helper function to capitalize status for display
   const capitalizeStatus = (status) => {
     if (!status) return 'Pending';
+    // Handle underscore-separated statuses like "changes_required"
+    if (status.includes('_')) {
+      return status.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ');
+    }
     return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   };
 
@@ -217,6 +256,11 @@ function ClimbRequest() {
       setLoading(false);
       return;
     }
+
+    // Store current admin display name/email for remarks
+    setCurrentAdminName(
+      currentUser.displayName || currentUser.email || 'Admin'
+    );
 
     // Set up auth state listener
     const unsubscribe = onAuthStateChange((user) => {
@@ -296,9 +340,10 @@ function ClimbRequest() {
           userId: booking.userId,
           name: user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User',
           email: user?.email || 'N/A',
-          phone: 'N/A',
-          phoneNumber: 'N/A',
+          phone: booking.phoneNumber || 'N/A',
+          phoneNumber: booking.phoneNumber || 'N/A',
           age: user?.birthDate ? calculateAge(user.birthDate) : 'N/A',
+          isSeniorCitizen: user?.birthDate ? isSeniorCitizen(user.birthDate) : false,
           affiliation: booking.affiliation || 'N/A',
           numberOfPorters: booking.numberOfPorters || 0,
           purposeOfClimb: booking.notes || booking.trekType || 'N/A',
@@ -326,6 +371,7 @@ function ClimbRequest() {
           phoneNumber: request.phoneNumber || '',
           age: request.age || '',
           email: request.email || '',
+          isSeniorCitizen: request.isSeniorCitizen || false,
           affiliation: request.affiliation || '',
           numberOfPorters: request.numberOfPorters ? String(request.numberOfPorters) : '',
           purposeOfClimb: request.purposeOfClimb || '',
@@ -370,6 +416,54 @@ function ClimbRequest() {
           }
         });
         setUploadedFiles(documents);
+
+        // Parse admin remarks (backward compatible with legacy plain text)
+        try {
+          if (booking.adminNotes) {
+            const parsed = JSON.parse(booking.adminNotes);
+            if (Array.isArray(parsed)) {
+              setRemarks(parsed);
+            } else if (typeof parsed === 'string') {
+              // Legacy: single string stored as JSON string
+              setRemarks([{
+                id: `${Date.now()}-${Math.random()}`,
+                text: parsed,
+                adminName: currentAdminName,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                edited: false
+              }]);
+            } else {
+              // Fallback: treat as plain text
+              setRemarks([{
+                id: `${Date.now()}-${Math.random()}`,
+                text: String(booking.adminNotes),
+                adminName: currentAdminName,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                edited: false
+              }]);
+            }
+          } else {
+            setRemarks([]);
+          }
+        } catch {
+          // adminNotes is plain text or invalid JSON
+          if (booking.adminNotes) {
+            setRemarks([{
+              id: `${Date.now()}-${Math.random()}`,
+              text: String(booking.adminNotes),
+              adminName: currentAdminName,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              edited: false
+            }]);
+          } else {
+            setRemarks([]);
+          }
+        }
+
+        // Keep legacy single-note state for compatibility (no longer used for UI)
         setAdminNote(booking.adminNotes || '');
         console.log('Setting selected request and showing modal');
         setShowDetailsModal(true);
@@ -595,11 +689,50 @@ function ClimbRequest() {
     };
   }, []);
 
-  const handleExport = (format) => {
-    // Export functionality
-    console.log(`Exporting as ${format}`);
-    info(`Exporting data as ${format.toUpperCase()}...`, 3000);
-    setShowExportMenu(false);
+  const handleExport = async (format) => {
+    try {
+      setShowExportMenu(false);
+      
+      // Get the data to export (use filtered requests if search is active, otherwise all requests)
+      const dataToExport = filteredRequests.length > 0 ? filteredRequests : requests;
+      
+      if (!dataToExport || dataToExport.length === 0) {
+        showError('No data available to export.', 4000);
+        return;
+      }
+
+      // Show loading message
+      info(`Exporting ${dataToExport.length} record(s) as ${format.toUpperCase()}...`, 3000);
+
+      // Generate filename based on filters
+      let filename = 'climb-requests';
+      if (selectedStatus !== 'all') {
+        filename += `-${selectedStatus}`;
+      }
+      if (selectedMonth !== 'all-time') {
+        filename += `-${selectedMonth}`;
+      }
+      if (searchTerm) {
+        filename += `-search`;
+      }
+
+      // Export based on format
+      if (format === 'excel') {
+        await exportToExcel(dataToExport, filename);
+        success(`Successfully exported ${dataToExport.length} record(s) as Excel.`, 4000);
+      } else if (format === 'pdf') {
+        await exportToPDF(dataToExport, filename);
+        success(`Successfully exported ${dataToExport.length} record(s) as PDF.`, 4000);
+      } else {
+        showError(`Unsupported export format: ${format}`, 4000);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      showError(
+        error.message || `Failed to export data as ${format.toUpperCase()}. Please try again.`,
+        6000
+      );
+    }
   };
 
   const handleFilterChange = (status) => {
@@ -624,6 +757,29 @@ function ClimbRequest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
 
+  // Handle opening booking from notification
+  useEffect(() => {
+    if (bookingIdToOpen) {
+      // Wait a bit for the component to mount and data to load
+      const timer = setTimeout(async () => {
+        try {
+          await handleActionClick(bookingIdToOpen, 'view');
+        } catch (error) {
+          console.error('Error opening booking from notification:', error);
+          showError('Failed to open booking details. Please try again.');
+        } finally {
+          // Notify parent that booking has been opened (or attempted)
+          if (onBookingOpened) {
+            onBookingOpened();
+          }
+        }
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingIdToOpen]);
+
   // Filter requests locally for search (or use the service)
   const filteredRequests = requests.filter(request => {
     if (!searchTerm) return true;
@@ -638,6 +794,14 @@ function ClimbRequest() {
       request.affiliation?.toLowerCase().includes(lowerSearchTerm)
     );
   });
+
+  // Determine if the currently selected request is approved/cancelled (used to lock actions)
+  const selectedStatusLower =
+    selectedRequest && (selectedRequest._booking?.status || selectedRequest.status)
+      ? (selectedRequest._booking?.status || selectedRequest.status).toLowerCase()
+      : '';
+  const isSelectedApproved = selectedStatusLower === 'approved';
+  const isSelectedCancelled = selectedStatusLower === 'cancelled';
 
   return (
     <div className="climb-main">
@@ -744,13 +908,6 @@ function ClimbRequest() {
                       </svg>
                       Export as PDF
                     </button>
-                    <button className="dropdown-item" onClick={() => handleExport('csv')}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="2"/>
-                        <polyline points="14,2 14,8 20,8" stroke="currentColor" strokeWidth="2"/>
-                      </svg>
-                      Export as CSV
-                    </button>
                   </div>
                 )}
               </div>
@@ -835,7 +992,7 @@ function ClimbRequest() {
                       <td>{request.dateSubmitted || 'Not specified'}</td>
                       <td>{request.requestedDate || 'Not specified'}</td>
                       <td>
-                        <span className={`status-badge ${(request.status || 'Pending').toLowerCase()}`}>
+                        <span className={`status-badge ${(request.status || 'Pending').toLowerCase().replace(/\s+/g, '_')}`}>
                           {request.status || 'Pending'}
                         </span>
                       </td>
@@ -893,7 +1050,7 @@ function ClimbRequest() {
                   <p className="submission-date">Submitted on {selectedRequest.dateSubmitted ? formatBookingDate(selectedRequest._booking?.createdAt || selectedRequest.dateSubmitted, 'full') : 'Not specified'}</p>
                 </div>
                 <div className="header-right">
-                  <span className={`status-badge-modal ${selectedRequest.status.toLowerCase()}`}>
+                  <span className={`status-badge-modal ${selectedRequest.status.toLowerCase().replace(/\s+/g, '_')}`}>
                     <span className="status-dot"></span>
                     {selectedRequest.status.toUpperCase()}
                   </span>
@@ -912,11 +1069,11 @@ function ClimbRequest() {
               </div>
               <div className="modal-body">
                 <form className="request-details-form">
-                  {/* Requester Information Section */}
+                  {/* Request Information Section */}
                   <div className="requester-section">
                     <div className="section-title-green">
                       <div className="section-line-green"></div>
-                      <h4>Requester Information</h4>
+                      <h4>Request Information</h4>
                     </div>
                     
                     {/* Full Name */}
@@ -953,6 +1110,18 @@ function ClimbRequest() {
                           className="form-input form-input-readonly"
                         />
                       </div>
+                    </div>
+
+                    {/* Senior Citizen */}
+                    <div className="form-field">
+                      <label>Senior Citizen</label>
+                      <input
+                        type="text"
+                        name="isSeniorCitizen"
+                        value={formData.isSeniorCitizen ? 'Yes' : 'No'}
+                        readOnly
+                        className="form-input form-input-readonly"
+                      />
                     </div>
 
                     {/* Email Address */}
@@ -1110,60 +1279,316 @@ function ClimbRequest() {
                     )}
                   </div>
 
-                  {/* Request Status Update Section */}
-                  <div className="status-update-section">
-                    <div className="section-title-green">
-                      <div className="section-line-green"></div>
-                      <h4>Request Status Update</h4>
+                {/* Remarks Section */}
+                <div className="status-update-section">
+                  <div className="section-title-green">
+                    <div className="section-line-green"></div>
+                    <h4>
+                      Remarks
+                      {remarks && remarks.length > 0 && (
+                        <span className="remarks-count">({remarks.length})</span>
+                      )}
+                    </h4>
+                  </div>
+
+                  {/* Remarks List (shown above input) */}
+                  {remarks && remarks.length > 0 && (
+                    <div className="remarks-list">
+                      {remarks.map((remark) => {
+                        const createdDate = remark.createdAt
+                          ? new Date(remark.createdAt)
+                          : new Date();
+                        const updatedDate = remark.updatedAt
+                          ? new Date(remark.updatedAt)
+                          : createdDate;
+                        const timestampLabel = updatedDate.toLocaleString();
+
+                        const isEditing = editingRemarkId === remark.id;
+
+                        return (
+                          <div key={remark.id} className="remark-card">
+                            <div className="remark-header">
+                              <div className="remark-meta">
+                                <span className="remark-admin">
+                                  {remark.adminName || 'Admin'}
+                                </span>
+                                <span className="remark-timestamp">
+                                  {timestampLabel}
+                                  {remark.edited && ' (edited)'}
+                                </span>
+                              </div>
+                              {!isSelectedApproved && !isSelectedCancelled && (
+                                <div className="remark-actions">
+                                  {isEditing ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="remark-update-btn"
+                                        onClick={async () => {
+                                          const text = editingText.trim();
+                                          if (!text || isSelectedApproved || isSelectedCancelled) return;
+
+                                          const nowIso = new Date().toISOString();
+                                          const updated = remarks.map((r) =>
+                                            r.id === remark.id
+                                              ? {
+                                                  ...r,
+                                                  text,
+                                                  updatedAt: nowIso,
+                                                  edited: true
+                                                }
+                                              : r
+                                          );
+
+                                          setRemarks(updated);
+                                          setEditingRemarkId(null);
+                                          setEditingText('');
+
+                                          try {
+                                            const bookingStatus =
+                                              selectedRequest._booking?.status ||
+                                              selectedRequest.status?.toLowerCase() ||
+                                              'pending';
+
+                                            await updateBookingStatus(
+                                              selectedRequest.id,
+                                              bookingStatus,
+                                              JSON.stringify(updated)
+                                            );
+
+                                            success('Remark updated successfully!', 4000);
+                                            await fetchClimbRequests();
+                                          } catch (err) {
+                                            console.error('Error updating remark:', err);
+                                            showError(
+                                              'Failed to update remark. Please try again.',
+                                              5000
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        Update
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="remark-cancel-btn"
+                                        onClick={() => {
+                                          setEditingRemarkId(null);
+                                          setEditingText('');
+                                        }}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="remark-edit-btn"
+                                        onClick={() => {
+                                          if (isSelectedApproved || isSelectedCancelled) return;
+                                          setEditingRemarkId(remark.id);
+                                          setEditingText(remark.text || '');
+                                        }}
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="remark-delete-btn"
+                                        onClick={async () => {
+                                          if (isSelectedApproved || isSelectedCancelled) return;
+                                          const confirmed = window.confirm(
+                                            'Are you sure you want to delete this remark?'
+                                          );
+                                          if (!confirmed) return;
+
+                                          const updated = remarks.filter(
+                                            (r) => r.id !== remark.id
+                                          );
+                                          setRemarks(updated);
+
+                                          try {
+                                            const bookingStatus =
+                                              selectedRequest._booking?.status ||
+                                              selectedRequest.status?.toLowerCase() ||
+                                              'pending';
+
+                                            await updateBookingStatus(
+                                              selectedRequest.id,
+                                              bookingStatus,
+                                              JSON.stringify(updated)
+                                            );
+
+                                            success('Remark deleted successfully!', 4000);
+                                            await fetchClimbRequests();
+                                          } catch (err) {
+                                            console.error('Error deleting remark:', err);
+                                            showError(
+                                              'Failed to delete remark. Please try again.',
+                                              5000
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="remark-body">
+                              {isEditing ? (
+                                <div
+                                  className={isSelectedApproved || isSelectedCancelled ? 'remarks-input-wrapper disabled' : 'remarks-input-wrapper'}
+                                  onClick={() => {
+                                    if (isSelectedApproved) {
+                                      warning(
+                                        'Cannot Add Remark: Remarks cannot be edited after the request has been approved.',
+                                        6000
+                                      );
+                                    } else if (isSelectedCancelled) {
+                                      warning(
+                                        'Cannot Add Remark: Remarks cannot be edited after the request has been cancelled.',
+                                        6000
+                                      );
+                                    }
+                                  }}
+                                  style={{ position: 'relative' }}
+                                >
+                                  <textarea
+                                    className="remark-edit-textarea"
+                                    value={editingText}
+                                    onChange={(e) => setEditingText(e.target.value)}
+                                    rows="3"
+                                    disabled={isSelectedApproved || isSelectedCancelled}
+                                    onFocus={() => {
+                                      if (isSelectedApproved) {
+                                        warning(
+                                          'Cannot Add Remark: Remarks cannot be edited after the request has been approved.',
+                                          6000
+                                        );
+                                      } else if (isSelectedCancelled) {
+                                        warning(
+                                          'Cannot Add Remark: Remarks cannot be edited after the request has been cancelled.',
+                                          6000
+                                        );
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="remark-text">
+                                  {remark.text}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+                  )}
+
+                  {/* New Remark Input (kept visible below the list) */}
+                  <div
+                    className={isSelectedApproved || isSelectedCancelled ? 'remarks-input-wrapper disabled' : 'remarks-input-wrapper'}
+                    onClick={() => {
+                      if (isSelectedApproved) {
+                        warning(
+                          'Cannot Add Remark: Remarks cannot be edited after the request has been approved.',
+                          6000
+                        );
+                      } else if (isSelectedCancelled) {
+                        warning(
+                          'Cannot Add Remark: Remarks cannot be edited after the request has been cancelled.',
+                          6000
+                        );
+                      }
+                    }}
+                    style={{ position: 'relative' }}
+                  >
                     <textarea
-                      value={adminNote}
-                      onChange={(e) => setAdminNote(e.target.value)}
-                      placeholder="Add your message here..."
+                      value={newRemarkText}
+                      onChange={(e) => setNewRemarkText(e.target.value)}
+                      placeholder="Add Remarks"
                       className="status-update-textarea"
-                      rows="4"
-                    />
-                    <button
-                      type="button"
-                      className="send-update-btn"
-                      onClick={async () => {
-                        if (adminNote.trim() && selectedRequest) {
-                          try {
-                            // Update booking with admin notes
-                            const bookingStatus = selectedRequest._booking?.status || selectedRequest.status?.toLowerCase() || 'pending';
-                            await updateBookingStatus(selectedRequest.id, bookingStatus, adminNote);
-                            success('Update sent successfully!', 4000);
-                            setAdminNote(''); // Clear the textarea
-                            // Refresh requests
-                            await fetchClimbRequests();
-                            // Refresh capacity info if available
-                            if (selectedRequest._booking?.trekDate) {
-                              try {
-                                const capacity = await checkTrekDateCapacity(selectedRequest._booking.trekDate, selectedRequest.id);
-                                setCapacityInfo(capacity);
-                              } catch (capErr) {
-                                console.error('Error refreshing capacity:', capErr);
-                              }
-                            }
-                          } catch (err) {
-                            console.error('Error sending update:', err);
-                            if (err.message && err.message.includes('maximum capacity')) {
-                              showError(err.message, 7000);
-                            } else {
-                              showError('Failed to send update. Please try again.', 5000);
-                            }
-                          }
+                      rows="3"
+                      disabled={isSelectedApproved || isSelectedCancelled}
+                      onFocus={() => {
+                        if (isSelectedApproved) {
+                          warning(
+                            'Cannot Add Remark: Remarks cannot be edited after the request has been approved.',
+                            6000
+                          );
+                        } else if (isSelectedCancelled) {
+                          warning(
+                            'Cannot Add Remark: Remarks cannot be edited after the request has been cancelled.',
+                            6000
+                          );
                         }
                       }}
-                      disabled={!adminNote.trim()}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Send Update
-                    </button>
+                    />
                   </div>
+                  <button
+                    type="button"
+                    className="send-update-btn"
+                    onClick={async () => {
+                      if (isSelectedApproved || isSelectedCancelled) return;
+                      const text = newRemarkText.trim();
+                      if (!text || !selectedRequest) return;
+
+                      const now = new Date().toISOString();
+                      const newRemark = {
+                        id: `${Date.now()}-${Math.random()}`,
+                        text,
+                        adminName: currentAdminName,
+                        createdAt: now,
+                        updatedAt: now,
+                        edited: false
+                      };
+
+                      const updatedRemarks = [...remarks, newRemark];
+                      setRemarks(updatedRemarks);
+                      setNewRemarkText('');
+
+                      try {
+                        // Change status to "changes_required" when adding a remark
+                        await updateBookingStatus(
+                          selectedRequest.id,
+                          'changes_required',
+                          JSON.stringify(updatedRemarks)
+                        );
+
+                        success('Remark added successfully!', 4000);
+                        await fetchClimbRequests();
+
+                        if (selectedRequest._booking?.trekDate) {
+                          try {
+                            const capacity = await checkTrekDateCapacity(
+                              selectedRequest._booking.trekDate,
+                              selectedRequest.id
+                            );
+                            setCapacityInfo(capacity);
+                          } catch (capErr) {
+                            console.error('Error refreshing capacity:', capErr);
+                          }
+                        }
+                      } catch (err) {
+                        console.error('Error adding remark:', err);
+                        showError('Failed to add remark. Please try again.', 5000);
+                      }
+                    }}
+                    disabled={!newRemarkText.trim() || !selectedRequest || isSelectedApproved || isSelectedCancelled}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Add Remarks
+                  </button>
+                </div>
                 </form>
               </div>
               {/* Capacity Warning */}

@@ -471,6 +471,17 @@
   text-align: center;
 }
 
+.status-badge.changes_required,
+.status-badge.changes-required {
+  background: #ea580c;
+  color: white;
+  border-radius: 0.5rem;
+  padding: 6px 8px;
+  font-size: 11px;
+  width: 140px;
+  text-align: center;
+}
+
 /* View Details Button */
 .view-details-btn {
   display: flex;
@@ -699,6 +710,20 @@
   height: 8px;
   border-radius: 50%;
   background: #6b7280;
+}
+
+.status-badge-modal.changes_required,
+.status-badge-modal.changes-required {
+  background: #fed7aa;
+  color: #9a3412;
+}
+
+.status-badge-modal.changes_required .status-dot,
+.status-badge-modal.changes-required .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ea580c;
 }
 
 .close-btn {
@@ -1324,6 +1349,13 @@
   flex-direction: column;
 }
 
+.remarks-count {
+  margin-left: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
 .status-update-textarea {
   width: 100%;
   padding: 12px 16px;
@@ -1340,6 +1372,139 @@
   margin-bottom: 16px;
 }
 
+.remarks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.remark-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.remark-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.remark-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.remark-admin {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.remark-timestamp {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.remark-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.remark-edit-btn,
+.remark-delete-btn,
+.remark-update-btn,
+.remark-cancel-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.remark-edit-btn {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.remark-edit-btn:hover {
+  background: #d1d5db;
+}
+
+.remark-delete-btn {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.remark-delete-btn:hover {
+  background: #fecaca;
+}
+
+.remark-update-btn {
+  background: #30622f;
+  color: #ffffff;
+}
+
+.remark-update-btn:hover {
+  background: #255020;
+}
+
+.remark-cancel-btn {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.remark-cancel-btn:hover {
+  background: #e5e7eb;
+}
+
+.remark-body {
+  margin-top: 4px;
+}
+
+.remark-text {
+  font-size: 14px;
+  color: #374151;
+  white-space: pre-wrap;
+}
+
+.remark-edit-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.remark-edit-textarea:focus {
+  outline: none;
+  border-color: #30622f;
+  box-shadow: 0 0 0 2px rgba(48, 98, 47, 0.1);
+}
+
+.remark-edit-textarea:disabled {
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+  cursor: not-allowed !important;
+  border-color: #d1d5db !important;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .status-update-textarea::placeholder {
   color: #9ca3af;
 }
@@ -1348,6 +1513,34 @@
   outline: none;
   border-color: #30622f;
   box-shadow: 0 0 0 3px rgba(48, 98, 47, 0.1);
+}
+
+.status-update-textarea:disabled {
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+  cursor: not-allowed !important;
+  border-color: #d1d5db !important;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.status-update-textarea:disabled::placeholder {
+  color: #d1d5db;
+}
+
+.remarks-input-wrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.remarks-input-wrapper.disabled {
+  cursor: not-allowed;
+  pointer-events: auto;
+}
+
+.remarks-input-wrapper.disabled textarea {
+  pointer-events: none;
 }
 
 .send-update-btn {

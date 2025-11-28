@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HighlightOffIcon from '@mui/icons-material/HighlightOff';
@@ -253,10 +253,13 @@ function ManageSchedule() {
     });
   };
 
-  const getEventsForDay = (day) => {
+  // Memoize getEventsForDay to ensure stable results - never filter by selectedDay for calendar display
+  const getEventsForDay = useCallback((day) => {
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
     
+    // Always use the full allBookings array - never filter by selectedDay for calendar display
+    // selectedDay should only affect the list view, not the calendar numbers
     return allBookings.filter(booking => {
       if (!booking.trekDate) return false;
       
@@ -276,7 +279,7 @@ function ManageSchedule() {
       
       return bookingDate.getTime() === targetDate.getTime();
     });
-  };
+  }, [allBookings, currentDate]);
 
   const formatMonthYear = (date) => {
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });

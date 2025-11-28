@@ -924,6 +924,18 @@
   background: #ffffff;
 }
 
+.notification-item-clickable {
+  cursor: pointer;
+}
+
+.notification-item-clickable:hover {
+  background: #f3f4f6;
+}
+
+.notification-item-clickable:active {
+  background: #e5e7eb;
+}
+
 .notification-item-icon {
   width: 48px;
   height: 48px;

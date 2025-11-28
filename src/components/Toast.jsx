@@ -68,17 +68,19 @@ const Toast = ({ message, type = 'info', duration = 5000, onClose, action }) => 
         <div className="toast-icon">{getIcon()}</div>
         <div className="toast-message">
           <div>{message}</div>
+        </div>
+        <div className="toast-actions">
           {action && (
             <button className="toast-action-btn" onClick={handleAction}>
               {action.label || 'Action'}
             </button>
           )}
+          <button className="toast-close" onClick={handleClose} aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </div>
-        <button className="toast-close" onClick={handleClose} aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
       </div>
     </div>
   );

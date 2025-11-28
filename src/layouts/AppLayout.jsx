@@ -14,6 +14,7 @@ import ClimbRequest from '../views/pages/ClimbRequest.jsx';
 import ManageSchedule from '../views/pages/ManageSchedule.jsx';
 import Reports from '../views/pages/Reports.jsx';
 import Utility from '../views/pages/Utility.jsx';
+import { useToast, ToastContainer } from '../components/Toast';
 
 function AppLayout({ onLogout }) {
   const [activeItem, setActiveItem] = useState('dashboard');
@@ -32,8 +33,11 @@ function AppLayout({ onLogout }) {
   const [notificationFilter, setNotificationFilter] = useState('all'); // 'all', 'unread', 'read'
   const [notificationSearch, setNotificationSearch] = useState('');
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [bookingIdToOpen, setBookingIdToOpen] = useState(null); // Track which booking to open from notification
+  const [deletedNotifications, setDeletedNotifications] = useState(new Map()); // Store deleted notifications for undo
   const notificationRef = useRef(null);
   const actionsMenuRef = useRef(null);
+  const { toasts, removeToast, success } = useToast();
   const [profileData, setProfileData] = useState({
     firstName: 'Administrator',
     lastName: '',
@@ -300,15 +304,91 @@ function AppLayout({ onLogout }) {
     setReadNotificationIds(prev => new Set([...prev, notificationId]));
   };
 
+  // Handle notification click - navigate to booking details
+  const handleNotificationClick = (notification) => {
+    if (notification.bookingId) {
+      // Mark as read
+      markAsRead(notification.id);
+      // Close notification panel
+      setShowNotifications(false);
+      // Navigate to climb request page
+      setActiveItem('climb');
+      // Set booking ID to open
+      setBookingIdToOpen(notification.bookingId);
+    }
+  };
+
   // Mark all as read
   const markAllAsRead = () => {
     const allIds = notificationsList.map(n => n.id);
     setReadNotificationIds(prev => new Set([...prev, ...allIds]));
   };
 
-  // Delete notification
-  const deleteNotification = (notificationId) => {
+  // Delete notification with undo functionality
+  const deleteNotification = (notificationId, event) => {
+    // Prevent event propagation if event is provided (to prevent notification click)
+    if (event) {
+      event.stopPropagation();
+    }
+    
+    // Find the notification to delete
+    const notificationToDelete = notificationsList.find(n => n.id === notificationId);
+    if (!notificationToDelete) return;
+    
+    // Store the deleted notification temporarily
+    const deletedNotification = { ...notificationToDelete };
+    setDeletedNotifications(prev => new Map(prev).set(notificationId, deletedNotification));
+    
+    // Remove from list
     setNotificationsList(prev => prev.filter(n => n.id !== notificationId));
+    
+    // Show toast with undo option (using success type for green color)
+    const toastId = success(
+      'Deleted notification',
+      5000, // 5 seconds
+      {
+        label: 'Undo',
+        onClick: () => {
+          // Restore the notification
+          setNotificationsList(prev => {
+            // Check if notification already exists
+            const exists = prev.find(n => n.id === notificationId);
+            if (exists) return prev;
+            
+            // Restore in the correct position (sorted by timestamp)
+            const restored = [...prev, deletedNotification];
+            return restored.sort((a, b) => {
+              const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+              const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+              return timeB - timeA;
+            });
+          });
+          
+          // Remove from deleted notifications map
+          setDeletedNotifications(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(notificationId);
+            return newMap;
+          });
+          
+          // Don't remove the toast - let it stay visible
+        }
+      }
+    );
+    
+    // Actually delete after toast expires (if not undone)
+    const deleteTimer = setTimeout(() => {
+      setDeletedNotifications(prev => {
+        const newMap = new Map(prev);
+        if (newMap.has(notificationId)) {
+          newMap.delete(notificationId);
+        }
+        return newMap;
+      });
+    }, 5000);
+    
+    // Store timer reference if needed for cleanup
+    return deleteTimer;
   };
 
   // Clear all notifications
@@ -578,7 +658,9 @@ function AppLayout({ onLogout }) {
                               return (
                                 <div 
                                   key={notification.id} 
-                                  className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
+                                  className={`notification-item ${!notification.isRead ? 'unread' : ''} ${notification.bookingId ? 'notification-item-clickable' : ''}`}
+                                  onClick={() => notification.bookingId && handleNotificationClick(notification)}
+                                  style={{ cursor: notification.bookingId ? 'pointer' : 'default' }}
                                 >
                                   <div className="notification-item-icon" style={{ backgroundColor: notification.iconColor }}>
                                     {getIcon()}
@@ -595,7 +677,7 @@ function AppLayout({ onLogout }) {
                                         {notification.timeAgo}
                                       </div>
                                     </div>
-                                    <div className="notification-item-actions">
+                                    <div className="notification-item-actions" onClick={(e) => e.stopPropagation()}>
                                       {!notification.isRead && (
                                         <button 
                                           className="notification-mark-read-text-btn"
@@ -606,7 +688,7 @@ function AppLayout({ onLogout }) {
                                       )}
                                       <button 
                                         className="notification-delete-text-btn"
-                                        onClick={() => deleteNotification(notification.id)}
+                                        onClick={(e) => deleteNotification(notification.id, e)}
                                       >
                                         Delete
                                       </button>
@@ -675,7 +757,7 @@ function AppLayout({ onLogout }) {
             </div>
           </header>
           {activeItem === 'dashboard' && <Dashboard onNavigate={setActiveItem} />}
-          {activeItem === 'climb' && <ClimbRequest />}
+          {activeItem === 'climb' && <ClimbRequest bookingIdToOpen={bookingIdToOpen} onBookingOpened={() => setBookingIdToOpen(null)} />}
           {activeItem === 'users' && <ManageSchedule />}
           {activeItem === 'reports' && <Reports />}
           {activeItem === 'utility' && <Utility />}
@@ -953,6 +1035,9 @@ function AppLayout({ onLogout }) {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }

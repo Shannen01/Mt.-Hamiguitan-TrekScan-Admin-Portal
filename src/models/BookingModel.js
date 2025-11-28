@@ -11,6 +11,7 @@ class BookingModel {
     this.numberOfPorters = data.numberOfPorters || 0;
     this.trekType = data.trekType || 'general'; // recreational | research
     this.location = data.location || null; // inside_san_isidro | inside_davao_oriental | outside_davao_oriental
+    this.phoneNumber = data.phoneNumber || null;
     this.notes = data.notes || null;
     this.adminNotes = data.adminNotes || null;
     this.attachments = data.attachments || [];
@@ -39,6 +40,9 @@ class BookingModel {
     }
     if (this.location) {
       map.location = this.location;
+    }
+    if (this.phoneNumber) {
+      map.phoneNumber = this.phoneNumber;
     }
     if (this.notes) {
       map.notes = this.notes;
@@ -70,6 +74,7 @@ class BookingModel {
         : parseInt(data.numberOfPorters) || 0,
       trekType: data.trekType || 'recreational',
       location: data.location || null,
+      phoneNumber: data.phoneNumber || null,
       notes: data.notes || null,
       adminNotes: data.adminNotes || null,
       attachments: (data.attachments || []).map(att => Attachment.fromMap(att)),
@@ -93,6 +98,7 @@ class BookingModel {
         : parseInt(map.numberOfPorters) || 0,
       trekType: map.trekType || 'recreational',
       location: map.location || null,
+      phoneNumber: map.phoneNumber || null,
       notes: map.notes || null,
       adminNotes: map.adminNotes || null,
       attachments: (map.attachments || []).map(att => Attachment.fromMap(att)),
@@ -112,6 +118,7 @@ class BookingModel {
       numberOfPorters: this.numberOfPorters,
       trekType: this.trekType,
       location: this.location,
+      phoneNumber: this.phoneNumber,
       notes: this.notes,
       adminNotes: this.adminNotes,
       attachments: this.attachments.map(att => 
