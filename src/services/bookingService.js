@@ -135,7 +135,12 @@ export const getAllBookings = async (filters = {}) => {
 export const getBookingById = async (bookingId) => {
   try {
     const booking = await getDocumentById(COLLECTION_NAME, bookingId);
-    return BookingModel.fromMap({ id: booking.id, ...booking });
+    console.log('Raw booking data from Firestore:', booking);
+    console.log('Location field in raw data:', booking.location);
+    console.log('Location type:', typeof booking.location);
+    const bookingModel = BookingModel.fromMap({ id: booking.id, ...booking });
+    console.log('BookingModel location after fromMap:', bookingModel.location);
+    return bookingModel;
   } catch (error) {
     console.error(`Error getting booking ${bookingId}:`, error);
     throw error;

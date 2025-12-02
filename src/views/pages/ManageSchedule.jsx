@@ -6,7 +6,7 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import FilterListAltIcon from '@mui/icons-material/FilterListAlt';
 import SearchIcon from '@mui/icons-material/Search';
 import EventNoteIcon from '@mui/icons-material/EventNote';
-import { getAllBookings } from '../../services/bookingService';
+import { getAllBookings, updateBookingStatus } from '../../services/bookingService';
 import { getUserById } from '../../services/userService';
 import { getCurrentUser, onAuthStateChange } from '../../services/firebaseAuthService';
 import { 
@@ -32,6 +32,69 @@ function ManageSchedule() {
   const filterRef = useRef(null);
   const monthYearRef = useRef(null);
 
+  // Function to automatically mark past approved bookings as completed
+  const markPastApprovedBookingsAsCompleted = async (bookings) => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Set to midnight for date comparison
+    
+    const updatePromises = [];
+    
+    for (const booking of bookings) {
+      // Only check approved bookings
+      if (booking.status?.toLowerCase() !== 'approved') {
+        continue;
+      }
+      
+      // Check if booking has a trekDate
+      if (!booking.trekDate) {
+        continue;
+      }
+      
+      // Convert trekDate to Date object
+      let trekDate;
+      if (booking.trekDate instanceof Timestamp) {
+        trekDate = booking.trekDate.toDate();
+      } else {
+        trekDate = new Date(booking.trekDate);
+      }
+      
+      // Set to midnight for accurate date comparison
+      trekDate.setHours(0, 0, 0, 0);
+      
+      // If trek date is in the past, mark as completed
+      if (trekDate < now) {
+        try {
+          updatePromises.push(
+            updateBookingStatus(booking.id, 'completed')
+              .then(() => {
+                console.log(`Automatically marked booking ${booking.id} as completed (trek date: ${trekDate.toISOString()})`);
+              })
+              .catch((error) => {
+                console.error(`Error updating booking ${booking.id} to completed:`, error);
+              })
+          );
+        } catch (error) {
+          console.error(`Error processing booking ${booking.id}:`, error);
+        }
+      }
+    }
+    
+    // Wait for all updates to complete (but don't block the UI)
+    if (updatePromises.length > 0) {
+      await Promise.allSettled(updatePromises);
+      // Refetch bookings after updates to get the latest status
+      try {
+        const updatedBookings = await getAllBookings();
+        return updatedBookings;
+      } catch (error) {
+        console.error('Error refetching bookings after status updates:', error);
+        return bookings; // Return original bookings if refetch fails
+      }
+    }
+    
+    return bookings;
+  };
+
   // Fetch bookings and calendar configs from Firebase
   useEffect(() => {
     const fetchData = async () => {
@@ -49,7 +112,10 @@ function ManageSchedule() {
           getCalendarSettings()
         ]);
         
-        setAllBookings(bookings);
+        // Automatically mark past approved bookings as completed
+        const updatedBookings = await markPastApprovedBookingsAsCompleted(bookings);
+        
+        setAllBookings(updatedBookings);
         setCalendarSettings(settings);
       } catch (error) {
         console.error('Error fetching data:', error);

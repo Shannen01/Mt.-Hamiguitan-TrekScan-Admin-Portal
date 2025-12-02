@@ -38,7 +38,7 @@ class BookingModel {
     if (this.id) {
       map.id = this.id;
     }
-    if (this.location) {
+    if (this.location !== null && this.location !== undefined) {
       map.location = this.location;
     }
     if (this.phoneNumber) {
@@ -73,7 +73,7 @@ class BookingModel {
         ? data.numberOfPorters 
         : parseInt(data.numberOfPorters) || 0,
       trekType: data.trekType || 'recreational',
-      location: data.location || null,
+      location: (data.location !== null && data.location !== undefined) ? data.location : null,
       phoneNumber: data.phoneNumber || null,
       notes: data.notes || null,
       adminNotes: data.adminNotes || null,
@@ -97,7 +97,7 @@ class BookingModel {
         ? map.numberOfPorters
         : parseInt(map.numberOfPorters) || 0,
       trekType: map.trekType || 'recreational',
-      location: map.location || null,
+      location: (map.location !== null && map.location !== undefined) ? map.location : null,
       phoneNumber: map.phoneNumber || null,
       notes: map.notes || null,
       adminNotes: map.adminNotes || null,

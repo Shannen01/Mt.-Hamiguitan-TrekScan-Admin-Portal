@@ -473,7 +473,7 @@
 
 .status-badge.changes_required,
 .status-badge.changes-required {
-  background: #ea580c;
+  background: #FFBF00;
   color: white;
   border-radius: 0.5rem;
   padding: 6px 8px;
@@ -714,8 +714,8 @@
 
 .status-badge-modal.changes_required,
 .status-badge-modal.changes-required {
-  background: #fed7aa;
-  color: #9a3412;
+  background: #FFBF00;
+  color: #ffffff;
 }
 
 .status-badge-modal.changes_required .status-dot,
@@ -723,7 +723,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ea580c;
+  background: #FFBF00;
 }
 
 .close-btn {

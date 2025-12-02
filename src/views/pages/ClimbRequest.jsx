@@ -4,7 +4,6 @@ import {
   getAllBookings, 
   getBookingById, 
   updateBookingStatus,
-  searchBookings,
   subscribeToBookings,
   formatBookingDate,
   checkTrekDateCapacity
@@ -91,13 +90,6 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
       let fetchedBookings = await getAllBookings(filters);
       console.log('Fetched bookings:', fetchedBookings?.length || 0, fetchedBookings);
       
-      // Apply search filter if search term exists
-      if (searchTerm) {
-        console.log('Applying search filter:', searchTerm);
-        fetchedBookings = await searchBookings(searchTerm, filters);
-        console.log('After search, bookings:', fetchedBookings?.length || 0);
-      }
-      
       if (!fetchedBookings || fetchedBookings.length === 0) {
         console.log('No bookings found');
         setRequests([]);
@@ -126,7 +118,7 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
               affiliation: booking.affiliation || 'N/A',
               numberOfPorters: booking.numberOfPorters || 0,
               purposeOfClimb: booking.notes || booking.trekType || 'N/A',
-              location: booking.location || null,
+              location: (booking.location !== null && booking.location !== undefined) ? booking.location : null,
               requestedDate: formatBookingDate(booking.trekDate, 'full'),
               dateSubmitted: formatBookingDate(booking.createdAt, 'full'),
               status: capitalizeStatus(booking.status),
@@ -154,7 +146,7 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
               affiliation: booking.affiliation || 'N/A',
               numberOfPorters: booking.numberOfPorters || 0,
               purposeOfClimb: booking.notes || booking.trekType || 'N/A',
-              location: booking.location || null,
+              location: (booking.location !== null && booking.location !== undefined) ? booking.location : null,
               requestedDate: formatBookingDate(booking.trekDate, 'full'),
               dateSubmitted: formatBookingDate(booking.createdAt, 'full'),
               status: capitalizeStatus(booking.status),
@@ -318,7 +310,7 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
         const user = booking.userId ? await getUserById(booking.userId) : null;
         console.log('User data:', user);
         console.log('Booking data:', booking);
-        console.log('Booking location:', booking.location);
+        console.log('Booking location (hometown):', booking.location);
         
         // Check capacity for this trek date
         setCheckingCapacity(true);
@@ -347,7 +339,7 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
           affiliation: booking.affiliation || 'N/A',
           numberOfPorters: booking.numberOfPorters || 0,
           purposeOfClimb: booking.notes || booking.trekType || 'N/A',
-          location: booking.location || null,
+          location: (booking.location !== null && booking.location !== undefined) ? booking.location : null,
           requestedDate: formatBookingDate(booking.trekDate, 'short'),
           dateSubmitted: formatBookingDate(booking.createdAt, 'short'),
           status: capitalizeStatus(booking.status),
@@ -366,6 +358,26 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
         });
         
         // Populate form with request data
+        // Ensure location (hometown) is fetched from booking
+        // Get location directly from booking object, handling null/undefined/empty string
+        // Check multiple sources: booking.location, booking._booking?.location, request.location
+        const hometown = (booking && booking.location !== null && booking.location !== undefined) 
+          ? booking.location 
+          : (booking && booking._booking && booking._booking.location !== null && booking._booking.location !== undefined)
+          ? booking._booking.location
+          : (request && request.location !== null && request.location !== undefined)
+          ? request.location
+          : (request && request._booking && request._booking.location !== null && request._booking.location !== undefined)
+          ? request._booking.location
+          : '';
+        console.log('Hometown value being set:', hometown);
+        console.log('Booking object:', booking);
+        console.log('Booking location:', booking?.location);
+        console.log('Booking location type:', typeof booking?.location);
+        console.log('Booking._booking location:', booking?._booking?.location);
+        console.log('Request location:', request?.location);
+        console.log('Request._booking location:', request?._booking?.location);
+        
         setFormData({
           fullName: request.name || '',
           phoneNumber: request.phoneNumber || '',
@@ -375,7 +387,7 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
           affiliation: request.affiliation || '',
           numberOfPorters: request.numberOfPorters ? String(request.numberOfPorters) : '',
           purposeOfClimb: request.purposeOfClimb || '',
-          location: request.location || ''
+          location: hometown
         });
         
         // Map attachments to documents format for display
@@ -745,17 +757,8 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
     setShowMonthMenu(false);
   };
 
-  // Handle search with debounce
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchTerm) {
-        fetchClimbRequests();
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  // Search is now handled by local filtering in filteredRequests
+  // No need to refetch when search term changes
 
   // Handle opening booking from notification
   useEffect(() => {
@@ -780,7 +783,7 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingIdToOpen]);
 
-  // Filter requests locally for search (or use the service)
+  // Filter requests locally based on search term
   const filteredRequests = requests.filter(request => {
     if (!searchTerm) return true;
     
@@ -1174,7 +1177,7 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
 
                     {/* Location */}
                     <div className="form-field">
-                      <label>Location</label>
+                      <label>Hometown</label>
                       <input
                         type="text"
                         name="location"
@@ -1560,6 +1563,16 @@ function ClimbRequest({ bookingIdToOpen, onBookingOpened }) {
                           'changes_required',
                           JSON.stringify(updatedRemarks)
                         );
+
+                        // Update the selected request status immediately in the modal
+                        setSelectedRequest(prev => ({
+                          ...prev,
+                          status: 'Changes Required',
+                          _booking: {
+                            ...prev._booking,
+                            status: 'changes_required'
+                          }
+                        }));
 
                         success('Remark added successfully!', 4000);
                         await fetchClimbRequests();
